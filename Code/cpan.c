@@ -11,6 +11,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "header.h"
 // #include "macro.h"
 // #include "monan.h"
@@ -29,8 +30,12 @@ int main(int argc, char **argv)
 {
   int i,k;
 /* read in an analysis file */
-
-  anread(argv[1],10);
+  if (argc == 3) {
+    anread(argv[1],atoi(argv[2]));
+  }else {
+    anread(argv[1],1);
+  }
+  printf("argc: %d\n",argc);
 
   printf("# harmonics = %d # timepoints = %d\n",nhar, npts);
 

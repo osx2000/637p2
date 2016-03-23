@@ -76,18 +76,19 @@ int anread(char *filnam, int nhreq)			    /* jwb 05/06/96 */
 pt:
   if(nhreq)						    /* jwb 05/06/96 */
   {
-    /*
+    
     fprintf(stderr, 					    
       "How many harmonics to read (default: %d)? ",	    
 					header.nhar);	    
     fgets(buffer, sizeof(buffer), stdin);
     nitems = sscanf(buffer, "%d", &nhar);
-    */
-    /*    if(nitems == -1) nhar = header.nhar; 		    
+    
+    if(nitems < 0) nhar = header.nhar; 		    
 	  else if(nitems == 0) 
     { fprintf(stderr,"input not recognized\n"); goto pt;}
-    */
-    nhar = header.nhar;
+    else if(nitems < header.nhar) { nhar = nitems; }
+    else { nhar = header.nhar; }
+
     if(nhar > header.nhar) 
     {
       fprintf(stderr,"only %d harmonics available\n", header.nhar);
