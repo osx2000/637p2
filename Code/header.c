@@ -26,13 +26,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include "header.h"
+#include <unistd.h>
+#include <fcntl.h> // open function
 #define P printf
 
 char *gstring();
 
 /* #ifdef __alpha */						/* jwb 8/12/94 */
-  byteswap2(short*);					/* jwb 8/12/94 */
-  byteswap4(int*);					/* jwb 8/12/94 */
+  void byteswap2(short*);					/* jwb 8/12/94 */
+  void byteswap4(int*);					/* jwb 8/12/94 */
   int i, *data;						/* jwb 8/12/94 */
 /* #endif */
 
@@ -145,14 +147,14 @@ char *gstring(fd) int fd;
 } /* end of function gstring */
 
 /* #ifdef __alpha */
-byteswap2(short* dat)
+void byteswap2(short* dat)
 {
   unsigned char *byte, temp;
   byte = (unsigned char *)dat;
   temp = byte[1]; byte[1] = byte[0]; byte[0] = temp;
 }
 
-byteswap4(int* dat)
+void byteswap4(int* dat)
 {
   unsigned char *byte, temp;
   byte = (unsigned char *)dat;

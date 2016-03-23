@@ -39,6 +39,8 @@ Changes:
 ******************************************************************************/
 #include <stdlib.h>
 #include <string.h>
+#include <fcntl.h> // open function
+#include <unistd.h> // close function
 #include "monan.h"
 #define USH_MAX 65535.					    /* jwb 02/24/94 */
 #define SH_MAX 32768.					    /* jwb 02/24/94 */
@@ -244,7 +246,7 @@ pt:
  *                 J. Beauchamp    4/28/87
  *
  *****************************************************************************/
-anwrite()
+void anwrite()
 {
   int i,j,k, fd, narg, nbytes, nhard, nharw;		/* jwb 11/05/95 */
   unsigned short int temp[2]; 				/* jwb 01/07/94 */

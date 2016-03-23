@@ -12,6 +12,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "header.h"
+// #include "macro.h"
+// #include "monan.h"
+// #include "g_raph.h"
 #define P printf
 int anread(char*, int);					    /* 05/06 /96 */
 
