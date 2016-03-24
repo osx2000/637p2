@@ -28,32 +28,43 @@ double ampscale;
 
 int main(int argc, char **argv)
 {
-  int i,k;
+  int i,k,harms;
 /* read in an analysis file */
   if (argc == 3) {
-    anread(argv[1],atoi(argv[2]));
-  }else {
-    anread(argv[1],1);
+    if (atoi(argv[2]) == 1) { 
+      printf("argv2: %d\n",atoi(argv[2]));
+      anread(argv[1],1); 
+    } else { 
+      printf("argv2!: %d\n",atoi(argv[2]));
+      anread(argv[1],atoi(argv[2])); 
+    }
+  } else {
+    anread(argv[1],-1);
   }
-  printf("argc: %d\n",argc);
 
   printf("# harmonics = %d # timepoints = %d\n",nhar, npts);
-
+  harms = 8;
 /* example code to illustrate data layout */
 
   printf("Amplitude data:\n");
-  printf("harmonic        1       2       3       4       5\n\n");
+  printf("harmonic ------>");
+  for (i=1;i<=harms;i++) {
+    printf("%9d",i);
+  } printf("\n\t      ∆t\n");
   for (i=0;i<10;i++) {
     printf("frame %d %f ",i,i*dt);
-    for (k=1;k<=5;k++)
+    for (k=1;k<=harms;k++)
       printf("%8.2f ",cmag[k + i*nhar1]);
     printf("\n");
   }
   printf("\nFrequency deviation data:\n");
-  printf("harmonic        1       2       3       4       5\n\n");
+  printf("harmonic ->    ");
+  for (i=1;i<=harms;i++) {
+    printf("%-9d",i);
+  } printf("\n\n");
   for (i=0;i<10;i++) {
     printf("frame %d ",i);
-    for (k=1;k<=5;k++)
+    for (k=1;k<=8;k++)
       printf("%8.2f ",dfr[k + i*nhar1]);
     printf("\n");
   }

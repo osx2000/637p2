@@ -32,11 +32,7 @@
 
 char *gstring();
 
-/* #ifdef __alpha */						/* jwb 8/12/94 */
-  void byteswap2(short*);					/* jwb 8/12/94 */
-  void byteswap4(int*);					/* jwb 8/12/94 */
-  int i, *data;						/* jwb 8/12/94 */
-/* #endif */
+
 
 /* Function to read header structure from file */
 void rdat(int fd,HEADER *head_data) 			/* jwb 11/05/95 */

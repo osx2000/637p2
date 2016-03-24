@@ -77,32 +77,33 @@ pt:
   if(nhreq)						    /* jwb 05/06/96 */
   {
     
-    fprintf(stderr, 					    
-      "How many harmonics to read (default: %d)? ",	    
-					header.nhar);	    
-    fgets(buffer, sizeof(buffer), stdin);
-    nitems = sscanf(buffer, "%d", &nhar);
+  //   fprintf(stderr, 					    
+  //     "How many harmonics to read (default: %d)? ",	    
+		// 			header.nhar);	    
+  //   fgets(buffer, sizeof(buffer), stdin);
+  //   nitems = sscanf(buffer, "%d", &nhar);
     
-    if(nitems < 0) nhar = header.nhar; 		    
-	  else if(nitems == 0) 
-    { fprintf(stderr,"input not recognized\n"); goto pt;}
-    else if(nitems < header.nhar) { nhar = nitems; }
-    else { nhar = header.nhar; }
+  //   if(nitems < 0) nhar = header.nhar; 		    
+	 //  else if(nitems == 0) 
+  //   { fprintf(stderr,"input not recognized\n"); goto pt;}
+  //   else if(nitems < header.nhar) { nhar = nitems; }
+  //   else { nhar = header.nhar; }
 
-    if(nhar > header.nhar) 
-    {
-      fprintf(stderr,"only %d harmonics available\n", header.nhar);
-      goto pt;
-    }
-    else if(nhar < 0)					    /* jwb 05/06/96 */
-    {
-      fprintf(stderr,
-          "No. of harmonics must be non-negative\n");       /* jwb 05/06/96 */
-      goto pt;						    /* jwb 05/06/96 */
-    }
-    P("Use nhar = %d\n", nhar);
+  //   if(nhar > header.nhar) 
+  //   {
+  //     fprintf(stderr,"only %d harmonics available\n", header.nhar);
+  //     goto pt;
+  //   }
+  //   else if(nhar < 0)					    /* jwb 05/06/96 */
+  //   {
+  //     fprintf(stderr,
+  //         "No. of harmonics must be non-negative\n");       /* jwb 05/06/96 */
+  //     goto pt;						    /* jwb 05/06/96 */
+  //   }
+  //   P("Use nhar = %d\n", nhar);
+  // }
   }
-  else nhar = header.nhar;
+  nhar = header.nhar;
 
   nhar1 = nhar + 1; /* note: nhar may be less than header.nhar */
   nhar2 = 2*header.nhar;				    /* jwb 11/11/94 */
