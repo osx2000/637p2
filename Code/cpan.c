@@ -24,8 +24,8 @@ float *cmag, *dfr, *phase, *br, *time, tl, dt, fa, smax, *newmag, *newfr,
   *finalfr;
 double ampscale;
 
-float *w, *a;
-int   *b, LR[2], brk, frames;
+float *w, *a, **ampData;
+int   *b, LR[2], brk, frames, **timeData;
 
 int findBreak();
 void findLR(int Nbk);
@@ -39,48 +39,57 @@ int main(int argc, char **argv)
   anread(argv[1],-1);
 
   printf("# harmonics = %d # timepoints = %d\n",nhar, npts);
-  //frames = npts;
+  frames = npts;
   harms = 1;
-  frames = 18; 
+
   if (argc == 3) 
     Nbk = atoi(argv[2]);
   else
     Nbk = N;
-  // dummy data for "actual" points
-  static const float DUMMY[] = {0,17,15,18,8,9,16,15,12,14,11,7,9,8,4,1,2,0};
 
   a = (float *) calloc(frames,sizeof(float));
   w = (float *) calloc(frames,sizeof(float));
   b = (int *) calloc(Nbk,sizeof(int));
+  ampData = (float **) calloc(harms,sizeof(float *));
+  timeData = (int **) calloc(harms,sizeof(int *));
 
-  memcpy(a, DUMMY, sizeof(DUMMY));
-  
-  // save startpoint as the first break point
-  for (i=1;i<Nbk;i++) { b[i]=-1; }
-  b[0]=0; brk=0;
+  //memcpy(a, DUMMY, sizeof(DUMMY));
 
-  // for each harmonic
+  // generate amplitude data for each harmonic
   for (k=1;k<=harms;k++) {
-    
-    for (i=0;i<frames-1;i++) {
-      w[i] = 0; // set all working points to zero
+ 
+    // set actual data
+    for (i=0;i<frames;i++) {
+      a[i] = cmag[k + i*nhar1] / 32768;
+    }
+
+    // set all working points to zero
+    for (i=0;i<frames;i++) {
+      w[i] = 0; 
     }    
-    //P("i%d %4d\n",0,b[0]);  
-    for (i=1;i<Nbk;i++) {
+
+    // save startpoint as the first break point
+    for (i=1;i<Nbk;i++) { b[i]=-1; }
+    b[0]=0; brk=0;    
+    for (i=1;i<Nbk-1;i++) {
       b[i] = findBreak();
-      //P("i%d %4d\n",i,b[i]);
       findLR(Nbk);
       interpolate(LR[0], b[i]);
       interpolate(b[i], LR[1]);
     }
+    b[Nbk-1]=frames-1; brk=0; 
+
+    // save this harmonics arrays of data
+    ampData[k] = w; // amps
+    timeData[k]= b; // breakpts
   }
-  // for (i=0;i<Nbk;i++) {
-  //   P("i%d %4d\n",i,b[i]);
-  // }
   P("working amps\n");
   for (i=0;i<frames;i++) {
-    P("w%.2d %4.2f\n",i,w[i]);
+    P("w%.2d %8.6f\n",i,w[i]);
   }
+  for (i=0;i<Nbk;i++) {
+    P("i%d %4d\n",i,b[i]);
+  } 
   free(a); free(w); free(b);
 }
 
