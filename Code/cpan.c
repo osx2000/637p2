@@ -14,7 +14,7 @@
 #include <string.h>
 #include "header.h"
 #define P printf
-#define N 9
+#define N 18
 int anread(char*, int);             /* 05/06 /96 */
 
 /*    global variables declared as externs in monan.h need a root position  */
@@ -55,12 +55,29 @@ int main(int argc, char **argv)
 
   //memcpy(a, DUMMY, sizeof(DUMMY));
 
+  // printf("Amplitude data:\n");
+  // printf("harmonic        1       2       3       4       5\n\n");
+  // for (i=0;i<10;i++) {
+  //   printf("frame %d %f ",i,i*dt);
+  //   for (k=1;k<=5;k++)
+  //     printf("%8.2f ",cmag[k + i*nhar1]);
+  //   printf("\n");
+  // }
+  // printf("\nFrequency deviation data:\n");
+  // printf("harmonic        1       2       3       4       5\n\n");
+  // for (i=0;i<frames;i++) {
+  //   printf("frame %d ",i);
+  //   for (k=1;k<=5;k++)
+  //     printf("%8.2f ",dfr[k + i*nhar1]);
+  //   printf("\n");
+  // }
+
   // generate amplitude data for each harmonic
   for (k=1;k<=harms;k++) {
  
-    // set actual data
+    // copy actual data
     for (i=0;i<frames;i++) {
-      a[i] = cmag[k + i*nhar1] / 32768;
+      a[i] = cmag[k + i*nhar1];
     }
 
     // set all working points to zero
@@ -68,7 +85,7 @@ int main(int argc, char **argv)
       w[i] = 0; 
     }    
 
-    // save startpoint as the first break point
+    // reset brkpts & set x=0 as first break point
     for (i=1;i<Nbk;i++) { b[i]=-1; }
     b[0]=0; brk=0;    
     for (i=1;i<Nbk-1;i++) {
@@ -77,19 +94,41 @@ int main(int argc, char **argv)
       interpolate(LR[0], b[i]);
       interpolate(b[i], LR[1]);
     }
-    b[Nbk-1]=frames-1; brk=0; 
+    // set x=frames-1 as the last break point
+    b[Nbk-1]=frames-1; brk=Nbk-1; 
 
     // save this harmonics arrays of data
     ampData[k] = w; // amps
     timeData[k]= b; // breakpts
   }
-  P("working amps\n");
+  // P("working amps\n");
+  // for (i=0;i<frames;i++) {
+  //   P("w%.2d %8.6f\n",i,w[i]);
+  // }
+  // P("1d\n");
+  // for (i=0;i<Nbk;i++) {
+  //   P("i%d %4d\n",i,b[i]);
+  // } 
+  P("generated amps\t\tactual amps\n");
+  P("--------------\t\t-----------\n");
   for (i=0;i<frames;i++) {
-    P("w%.2d %8.6f\n",i,w[i]);
+    P("w%.2d %8.2f\t\t",i,ampData[1][i]);
+    P("w%.2d %8.2f\n",i,cmag[1 + i*nhar1]);
   }
-  for (i=0;i<Nbk;i++) {
-    P("i%d %4d\n",i,b[i]);
-  } 
+  // for (i=0;i<10;i++) {
+  //   printf("frame %d %f ",i,i*dt);
+  //   for (k=1;k<=5;k++)
+  //     printf("%8.2f ",cmag[k + i*nhar1]);
+  //   printf("\n");
+  // }  
+  // P("break point\n");
+  // for (k=1;k<=harms;k++) {
+  //   P("harmonic %d\n",k);
+  //   for (i=0;i<Nbk;i++) {
+  //     P("i%d %4d\n",i,timeData[k][i]);
+  //   }     
+  // }
+
   free(a); free(w); free(b);
 }
 
