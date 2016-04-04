@@ -15,7 +15,8 @@
 #include <ctype.h>
 #include "header.h"
 #define P printf
-#define N 18
+#define NBREAKS 8
+#define NHARMS 20
 int anread(char*, int);             /* 05/06 /96 */
 
 /*    global variables declared as externs in monan.h need a root position  */
@@ -44,12 +45,12 @@ int main(int argc, char **argv)
 
   printf("# harmonics = %d # timepoints = %d\n",nhar, npts);
   frames = npts;
-  harms = 20;
-  //P("ampscale=%f\n",ampscale);
+  harms = NHARMS;
+
   if (argc == 3) 
-    Nbk = atoi(argv[2]);
+    Nbk = atoi(argv[2]) * tl + 2;
   else
-    Nbk = N;
+    Nbk = NBREAK * tl + 2;
 
   // allocate space for the final data structures
   ampData = (float **)malloc(harms*sizeof(float*));
@@ -59,9 +60,7 @@ int main(int argc, char **argv)
     timeData[i] = (float *)malloc(Nbk*sizeof(float));
   }
 
-  //ampData[0] = 0; timeData[0] = 0;
-
-  // generate amplitude data for each harmonic
+  // generate amplitude/time data for each harmonic
   for (k=1;k<=harms;k++) { 
 
     a = (float *) calloc(frames,sizeof(float));
@@ -78,7 +77,9 @@ int main(int argc, char **argv)
     }    
     // reset brkpts & set x=0 as first break point
     for (i=1;i<Nbk;i++) { b[i]=-1; }
-    b[0]=0; brk=0;    
+    b[0]=0; brk=0; 
+
+    // find break point, interpolate segments from L -> brk -> R   
     for (i=1;i<Nbk-1;i++) {
       b[i] = findBreak();
       findLR(Nbk);
@@ -90,25 +91,21 @@ int main(int argc, char **argv)
     b[Nbk-1]=frames-1; brk=Nbk-1;
     qsort(b,Nbk,sizeof (int),compare_ints);
 
-    // copy values & breaks
+    // copy amps & time deltas
     for (i=0;i<Nbk;i++) {
       if (i==0) {
         timeData[k-1][i] = b[i]*dt;
       } else {
         timeData[k-1][i] = (b[i] - b[i-1])*dt; 
       }    
-      ampData[k-1][i]  = a[b[i]] / 32768;
+      ampData[k-1][i]  = a[b[i]] / 32768; // *32768 is scalar*
     }
 
     free(a); free(w); free(b); 
   }
-  // P("generated amps\t\tactual amps\n");
-  // P("--------------\t\t-----------\n");
-  // for (i=0;i<frames;i++) {
-  //   P("w%.2d %8.2f\t\t",i,ampData[1][i]);
-  //   P("w%.2d %8.2f\n",i,cmag[1 + i*nhar1]);
-  // }
+
   makeSAOL(argv[1]);
+  makeSASL(argv[1]);
 
   free(ampData); free(timeData);
 }
@@ -129,7 +126,6 @@ void makeSAOL (char *filename) {
   for (k=0;k<harms;k++) {
     snprintf(env[k], 6, "%s%.2d", "env", k+1);
     snprintf(y[k], 4, "%s%.2d", "y", k+1);
-    //P("e: %s, y: %s\n",env[k],y[k]);
   }
 
   // open/create output file
@@ -139,7 +135,7 @@ void makeSAOL (char *filename) {
   }
 
   // write formatted text and data to file
-  fprintf(fp,"global {\n table cyc(harm,128,1);\n srate %f;\n}\n\n",22050.0);
+  fprintf(fp,"global {\n table cyc(harm,128,1);\n srate %f;\n}\n\n",22050.0);//*sample rate 22050*
   fprintf(fp,"instr %s (fr) {\n imports exports table cyc;\n\n ivar scalar;\n ksig ",instr);
   for (k=0;k<harms;k++) {
     if (k==harms-1)
@@ -153,10 +149,10 @@ void makeSAOL (char *filename) {
     else
       fprintf(fp,"%s,",y[k]);
   }
+
   fprintf(fp,"\n\n// **********************\n// computed during k-pass\n\n");
   for (k=0;k<harms;k++) {
     for (i=0;i<Nbk;i++) {
-      //P("\t%f, %f,\n",timeData[k][i]*dt, ampData[k][timeData[k][i]]);
       if (i==0) {
         fprintf(fp, "%s = kline(0,\n",env[k]);
       }
@@ -167,7 +163,19 @@ void makeSAOL (char *filename) {
       }
     }         
   }
-  
+
+  fprintf(fp,"\n\n// **********************\n// computed during a-pass\n\n");
+  for (k=0;k<harms;k++) {
+    fprintf(fp, "%s = %s * oscil(cyc, fr * %d);\n",y[k],env[k],k+1);       
+  }  
+  fprintf(fp,"\noutput(");
+  for (k=0;k<harms;k++) {
+    if (k==harms-1) {
+      fprintf(fp,"%s);\n\n}", y[k]);
+    } else {
+      fprintf(fp,"%s+", y[k]);
+    }
+  }  
 
   P("%s file created\n",fname);
   fclose(fp);
@@ -224,6 +232,7 @@ void interpolate (int L, int R) {
   }
 }
 
+// compare_function for qsort()
 int compare_ints (const void *a, const void *b) {
   const int *da = (const int *) a;
   const int *db = (const int *) b;
