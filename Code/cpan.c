@@ -50,7 +50,7 @@ int main(int argc, char **argv)
   if (argc == 3) 
     Nbk = atoi(argv[2]) * tl + 2;
   else
-    Nbk = NBREAK * tl + 2;
+    Nbk = NBREAKS * tl + 2;
 
   // allocate space for the final data structures
   ampData = (float **)malloc(harms*sizeof(float*));
