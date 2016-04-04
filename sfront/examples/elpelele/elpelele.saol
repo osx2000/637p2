@@ -1,0 +1,348 @@
+
+// elpelele.saol
+// "El Pelele, E. Granados", MIDI: R. Finley, Piano: E. Scheirer
+// Originally written by Eric Scheirer
+// Modified by John Lazzaro
+// song length: 8 minutes, 50.192 seconds (530.192 seconds)
+//
+
+global { 
+  interp 0;
+  srate 44100; 
+  krate 1050; 
+  ksig rvb_on, distance;
+  outchannels 2; 
+  table A0(sample, - 1, "samp_1.aif"); 
+  table C2(sample, - 1, "samp_3.aif"); 
+  table F2(sample, - 1, "samp_5.aif"); 
+  table Ds3(sample, - 1, "samp_7.aif"); 
+  table Cs4(sample, - 1, "samp_9.aif"); 
+  table Fs4(sample, - 1, "samp_11.aif"); 
+  table B4(sample, - 1, "samp_13.aif"); 
+  route (dry, piano); 
+
+// change "large_room" to "small_room" or "schroeder"
+// for alternative reverbs
+
+  send (large_room; 0.650000, 1; dry); 
+  route (wet, large_room); 
+
+  send (mix;; dry, wet); 
+  }
+ 
+//
+// instr piano
+//
+// sample player of global tables
+//
+
+instr piano (pitch, vel) preset 0 { 
+  ivar cps, scale, t, l, b, cut; 
+  ksig kamp, localtime, segment, first; 
+  asig samp;
+  // selects sample based on midi numbers 
+  table pitchmap(step, - 1, 0, 0, 28, 1, 38, 2, 46, 3, 55, 4, 64, 5, 69, 6, 200); 
+  // bogus loop points -- samples are long enough w/o looping
+  table loop(data, - 1, 197584, 151848, 137124, 132915, 104285, 59648, 50773); 
+  // base frequency for each table
+  table base(data, - 1, 21, 36, 41, 51, 61, 66, 71); 
+  imports exports table A0, C2, F2, Ds3, Cs4, Fs4, B4; 
+  // pno[] indexed by pitchmap values
+  tablemap pno (A0, C2, F2, Ds3, Cs4, Fs4, B4); 
+
+  if (! first) { 
+    segment = 1; 
+    first = 1; 
+    } 
+
+  // i-rate -- starting parameters for note
+
+  pitch = pitch - 12; 
+  t = tableread (pitchmap, pitch); 
+  l = tableread (loop, t); 
+  b = cpsmidi (tableread (base, t)); 
+  cps = cpsmidi (pitch); 
+  scale = (vel / 128) * (vel / 128) / 2; 
+
+  // k-rate -- note envelope
+
+  localtime = localtime + 1 / k_rate; 
+  if (segment == 1) { 
+    if (localtime < 0.010000) { 
+      kamp = kline (0, 0.010000, scale); 
+      } 
+    else { 
+      segment = 2; 
+      } 
+    } 
+  if (segment == 2) { 
+    kamp = scale; 
+    if (localtime > 5.000000) { 
+      segment = 4; 
+      turnoff; 
+      } 
+    } 
+  if (released && segment < 3) { 
+    if (MIDIctrl[64] > 15) { 
+      segment = 3; 
+      extend (5.000000 - localtime); 
+      } 
+    else { 
+      segment = 4; 
+      localtime = 0; 
+      extend (0.100000); 
+      } 
+    } 
+  if (segment == 3) { 
+    if (MIDIctrl[64] <= 15) { 
+      segment = 4; 
+      localtime = 0; 
+      } 
+    else { 
+      kamp = scale; 
+      if (localtime >= 5.000000) { 
+        turnoff; 
+        } 
+      } 
+    } 
+  if (segment == 4) { 
+    kamp = var_kline(scale, 0.100000, 0); 
+    if (localtime >= 0.100000) { 
+      turnoff; 
+      } 
+    } 
+
+  // a-rate
+
+  samp = kamp *  loscil(pno [ t ], cps, b, l); 
+  output (samp * (1 - (pitch / 100)), samp * pitch / 100); 
+
+  } 
+
+//
+// opcode var_kline -- helper routine for piano
+//
+
+kopcode var_kline(ksig st, ksig t, ksig e) { 
+  ksig ltime, val; 
+
+  val = ltime / t * (e - st) + st; 
+  ltime = ltime + 1 / k_rate; 
+  return (val); 
+  } 
+
+// 
+// instr large_room 
+//
+// used in default settings
+//
+
+instr large_room (revgain, distance)  { 
+  asig first; 
+  ivar f, lpf_pos, lpf_cut, d2; 
+  asig out[2]; 
+  table sections (data, - 1, 1, 10, 43, 44, 164, 165, 242); 
+  table gains(data, - 1, 0.300000, 0.300000, 0.500000, 0.250000, 0.500000, 0.250000, 0.250000); 
+  table lengths (data, - 1, 8, 12, 87, 62, 120, 76, 30); 
+  table outs(data, - 1, 26, 161, 290); 
+  table outg(data, - 1, 0.340000, 0.140000, 0.140000); 
+  ksig num_sec, num_out;
+ 
+
+// i-rate
+
+  lpf_pos = 295; 
+  lpf_cut= 2600; 
+  d2 = distance * distance; 
+
+// k-rate
+
+  num_sec= ftlen (sections); 
+  num_out = ftlen (outs); 
+
+// a-rate
+
+  out = gen_allpass(sections, num_sec, gains, lengths, outs, num_out, outg,
+                    lpf_pos, lpf_cut, 1 / 1000, revgain); 
+
+  output ((input[0]/ d2 + out[0]) * distance, (input[1]/ d2 + out[1]) * distance); 
+  } 
+
+//
+// gen_allpass -- where *_room reverb gets computed
+//
+// uses fracdelay as a reverberation engine
+//
+
+aopcode gen_allpass(table sections, ksig num_sec, table gains,
+          table lengths, table outs, ksig num_out, 
+         table outg, ivar lpf_pos, ivar lpf_cut, ivar f, ivar revgain) { 
+  
+  oparray fracdelay[1]; 
+  asig first, outl, outr, p1, p2, g, tap1, tap2, i, fb, sum; 
+
+  // initializes fracdelat as a 300ms tapped line
+
+  if (! first && input[0]) { 
+    fracdelay[0](1, 0.300000); 
+    first = 1; 
+    } 
+
+  if (first) { 
+
+    // recirculate delay taps through line
+
+    i = 0; 
+    while (i < num_sec) { 
+      p1 = tableread (sections, i) * f; 
+      p2 = floor (p1 + tableread (lengths, i) * f); 
+      g = tableread (gains, i); 
+      tap1 = fracdelay[0](2, p1);        // read tap
+      fracdelay[0](4, p2, tap1 * - g);   // add back in
+      tap2 = fracdelay[0](2, p2);        // read tap
+      fracdelay[0](4, p1, tap2 * g);     // add back in
+      i = i + 1; 
+      } 
+
+   // compute new output
+
+    outl = 0; 
+    outr = 0; 
+    i = 0; 
+    while (i < num_out) { 
+      p1 = tableread (outs, i) * f; 
+      g = tableread (outg, i); 
+      outl = outl + fracdelay[0](2, p1) * g; 
+      outr = outr + fracdelay[0](2, p1 + pow (- 1, i) * f) * g; 
+      i = i + 1; 
+      } 
+    p1 = lpf_pos * f; 
+    tap1 = fracdelay[0](2, p1); 
+    fb = lopass (tap1, lpf_cut) * revgain; 
+    i = 0; 
+
+    // compute new input into line
+
+    sum = 0; 
+    while (i < 2) { 
+      sum = sum + input [ i ]; 
+      i = i + 1; 
+      } 
+
+    // insert new input, then shift
+
+    fracdelay[0](3, 0, sum + fb); 
+    fracdelay[0](5); 
+    return (outl, outr); 
+    } 
+  else { 
+    return (0, 0); 
+    } 
+  } 
+
+//
+// instr mix
+//
+// mixes reverb and direct sound equally
+//
+
+instr mix () { 
+  asig out[2]; 
+
+  out[0] = input[0]*1 + input[1]*0 + input[2]*1 + input[3]*0; 
+  out[1] = input[0]*0 + input[1]*1 + input[2]*0 + input[3]*1; 
+  output(out); 
+  } 
+
+//
+// instr small_room
+//
+// alternative reverb, uses gen_allpass as engine
+//
+
+instr small_room (revgain) { 
+  asig first; 
+  ivar f, lpf_pos, lpf_cut, d2; 
+  asig out[2]; 
+  table sections (data, - 1, 24, 25, 48, 61, 62); 
+  table gains (data, - 1, 0.300000, 0.400000, 0.600000,
+                                    0.100000, 0.400000); 
+  table lengths (data, - 1, 35, 22, 8.300000, 66, 30); 
+  table outs (data, - 1, 60, 129); 
+  table outg (data, - 1, 0.500000, 0.500000); 
+  ksig num_sec, num_out;
+ 
+// i-rate 
+
+  lpf_pos = 128; 
+  lpf_cut = 4200; 
+
+  num_sec= ftlen (sections); 
+  num_out = ftlen (outs); 
+
+// k-rate 
+
+  out = gen_allpass(sections, num_sec, gains, lengths, outs, num_out, 
+                    outg, lpf_pos, lpf_cut, 1 / 1000, revgain); 
+  output (out); 
+  } 
+
+//
+// instr schroeder
+//
+// alternative reverb, uses comb and allpass sections
+//
+
+instr schroeder (rt) { 
+  ksig first, ki, d2; 
+  asig in, ap1, ap2; 
+  asig c[4]; 
+  asig outL, outR; 
+  ivar t[4], revgain[4], i; 
+  table timeconst (data, 5, 0.030000, 0.034300, 0.039300,
+	                    0.045000, 0.000000); 
+  imports exports ksig rvb_on, distance; 
+  oparray comb [4];
+ 
+  in = input[0]+ input[1]; 
+  if (first == 0) { 
+    rvb_on = 1; 
+    first = 1; 
+    distance = 0.600000; 
+    } 
+  d2 = distance * distance; 
+  i = 0; 
+  while (i < 4) { 
+    t [ i ] = tableread (timeconst, i); 
+    revgain [ i ] = combgain (t [ i ], rt); 
+    i = i + 1; 
+    } 
+  if (rvb_on) { 
+    ap1 = allpass (in / distance, 0.001700, 0.700000); 
+    ap2 = allpass (ap1, 0.005000, 0.700000); 
+    c[0]= comb (ap2, t[0], revgain[0]); 
+    c[1]= comb (ap2, t[1], revgain[1]); 
+    c[2]= comb (ap2, t[2], revgain[2]); 
+    c[3]= comb (ap2, t[3], revgain[3]); 
+    outL = (c[0]+ c[1]+ c[2]+ c[3]) / 4; 
+    outR = (c[0]- c[1]+ c[2]- c[3]) / 4; 
+    output ((input[0]/ d2 + outL) * distance * 0.750000,
+	    (input[1]/ d2 + outR) * distance * 0.750000); 
+    } 
+  else { 
+    output (input); 
+    } 
+  } 
+
+//
+// opcode combgain
+//
+// helper routine for schroeder
+//
+
+opcode combgain (xsig t, xsig rt) { 
+  xsig temp; 
+
+  temp = exp (log (10) * - 3 * t / rt); 
+  return (temp); 
+  } 

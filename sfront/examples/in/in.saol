@@ -1,0 +1,28 @@
+
+// in.saol
+// Test program 
+// Written by John Lazzaro
+//
+// Demonstrates input_bus
+// Gets inchannels and srate from input file
+// during sfront execution (not sa.c execution).
+//
+
+global {
+krate 100;
+outchannels 2;
+send (fl; ; input_bus);
+}
+
+
+
+instr fl () {
+
+ asig l,r;
+
+ l = 0.9*(flange(input[0],0.1,25) + input[0]);  
+ r = 0.9*(flange(input[1],0.1,25) + input[1]);  
+ 
+ output(l,r);
+
+}

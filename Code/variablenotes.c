@@ -21,3 +21,5 @@ int   brc               // breakpoint counter
 float actual[]          // a[]  size 'aSize' = frames
 float working[]         // w[]  size 'aSize' = frames
 int   brkpts[]          // b[]  size 'nbreaks'   
+
+float actual[] = {0,17,15,18,8,9,16,15,12,14,11,7,9,8,4,1,2,0};

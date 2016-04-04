@@ -1,0 +1,14 @@
+
+Networking support has been disabled in this distribution.
+Thus, the examples in this directory will not work.
+
+To learn more, see sfront/src/NETWORK.HTML
+
+The original README for this example appears below.
+
+---
+
+This example doesn't use audio: it simply sends -cin ascii MIDI data
+onto the network. It should run everywhere the ascii driver runs 
+(i.e. UNIX-like OS's, including OS X).
+

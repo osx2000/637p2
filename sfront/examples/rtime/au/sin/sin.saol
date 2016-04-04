@@ -1,0 +1,141 @@
+
+//
+// AudioUnit MusicDevice (aumu) example
+// Sine wave synth with variable attack and release
+//
+
+global {
+  srate 44100;  // AU Host may change this value
+  krate 1050; 
+  outchannels 1;
+
+  // Parameters shown in AudioUnit User Interface
+  // Order of appearance sets parameter order for Factory Presets
+
+  ksig aup_Attack;
+  ksig aup_Release;
+  ksig aup_Notes_On;
+
+  // Sets the user-interface widget for each parameter
+  //
+  // Options: slider,            slider_linear, 
+  //          slider_log,        slider_exp,
+  //          slider_squareroot, slider_squarelaw,
+  //          slider_cuberoot,   slider_cubic,
+  //          menu,              checkbox,
+  //          display_menu, display_checkbox, display_number
+
+  ksig aup_Attack_slider_log;
+  ksig aup_Release_slider_log;
+  ksig aup_Notes_On_display_checkbox;
+
+  // Sets the unit to display next to the slider
+  // Units are not used for checkbox and menu widgets
+
+  ksig aup_Attack_unit_s;
+  ksig aup_Release_unit_s;
+  
+  // Parameter info                  min   default   max
+
+  table   aup_Attack_pinfo(data, 3, 0.001,   0.01,   0.25);
+  table  aup_Release_pinfo(data, 3, 0.001,   0.05,   0.25); 
+  table aup_Notes_On_pinfo(data, 3,     0,      0,   1); 
+	
+  // Factory Preset Tables          Attack   Release  NoteOn        
+
+  table aup_factory_Quick(data,  3,  0.005,   0.025,   0);
+  table aup_factory_Normal(data, 3,  0.05,    0.075,   0);
+  table   aup_factory_Slow(data, 3,  0.200,   0.200,   0);
+
+  ksig note_count;    // number of notes currently playing
+}
+
+// instr "tone" plays the MIDI notes
+
+instr tone (pitch, vel) preset 0 { 
+
+  imports exports ksig aup_Attack;     // matches globals
+  imports exports ksig aup_Release;
+  imports exports ksig aup_Notes_On;
+  imports exports ksig note_count;
+
+  ivar a;                              // osc constant
+  ksig attack, attack_incr, tot_incr;  // attack constants
+  ksig release, release_mult;          // rel constants
+
+  ksig incr, rel, tot;                 // envelope state
+  asig x, y, init;                     // osc state
+  asig env;                            // envelope state
+
+
+  // **********************
+  // computed during i-pass
+  // **********************
+
+  // compute oscillator constant
+
+  a = 2.0*sin(3.14159*cpsmidi(pitch)/s_rate);
+
+  // **********************
+  // computed during k-pass
+  // **********************
+
+  if (itime == 0)  // compute envelope constants
+    {
+      attack = int(aup_Attack*k_rate)/k_rate;
+      attack_incr = (vel/256)/(attack*s_rate);
+      tot_incr = (vel/256)/(attack*k_rate);
+      release = int(aup_Release*k_rate)/k_rate;
+      release_mult = 1/((release + 2/k_rate)*s_rate);
+      note_count = note_count + 1;
+      aup_Notes_On = 1;
+    }
+
+  // update envelope k-rate state
+
+  incr = 0;  // no increment during envelope sustain
+
+  if (released)  // detect user releasing a note
+    {
+      if (rel)
+	{
+	  note_count = note_count - 1;
+	  aup_Notes_On = (note_count > 0) ? 1 : 0;
+	}
+      else
+	{
+	  rel = 1;
+	  extend(release);
+	}
+    }
+
+  if (rel)  // update release envelope ?
+    {
+      incr = -tot*release_mult;
+    }
+  else
+    {
+      if (itime < attack)  // update attack envelope ?
+	{
+	  incr = attack_incr;
+	  tot = tot + tot_incr;
+	}
+    }
+
+ 
+  // **********************
+  // computed during a-pass
+  // **********************
+
+  if (init == 0)     // initialize osc state
+    {
+      x = 0.25;
+      init = 1;
+    }
+
+  x = x - a*y;        // update osc state
+  y = y + a*x;
+
+  env = env + incr;  // update envelope state
+  output(env*y);     // mono audio out
+}

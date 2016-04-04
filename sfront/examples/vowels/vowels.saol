@@ -1,0 +1,117 @@
+
+// vowels.saol
+// A simple singing synthesizer
+// Originally written by Eric Scheirer
+// Modified by John Lazzaro
+// Song length: 10 seconds
+//
+// Changes:
+//
+//    [1] "Fast" option uses table to replace buzz()
+//    [2] Variable tcount counts number of kcycles for a
+//        vowel transition -- previous implementation was prone
+//        to roundoff.
+//    [3] K-rate cpsmidi() opcode was part of a-rate statement in
+//        original, a strict decoder would not produce desired sound.
+//
+// This instrument should work as is in pre-FDIS saolc.
+
+global { 
+  srate 44100 ; 
+  krate 420 ; 
+  outchannels 1 ; 
+  } 
+
+instr voice1 ( startmidi , startvwl , startamp ) { 
+  asig vibfreq , a , reson1 , reson2 , out ; 
+  ksig kinit , f1 , f2 , curf1 , curf2 , ct , oldf1 , oldf2, tcount ; 
+  imports ksig vowel,  amp , pitch , cpspitch, stop ; 
+  table vib ( harm , 128 , 1 ) ; 
+  table buzztable(buzz, 128, 0, 1, 0.8);
+  ivar trans, ratio, fast ; 
+  
+  // i-rate
+
+  fast = 0;       // 1 chooses table implementation
+  trans = 0.100 ; // transition time between vowels, in seconds
+  ratio = 40;     // number of kcycles for a transition (16000/400) 
+
+  // k-rate 
+ 
+  if ( ! kinit ) {      // initializes pitch/loudness/format at note launch
+    kinit = 1 ; 
+    vowel = startvwl ; 
+    amp = startamp ; 
+    pitch = startmidi ; 
+    } 
+  if ( stop ) { 
+    turnoff ; 
+    } 
+  cpspitch = cpsmidi ( pitch ); 
+
+  // calculate end-points of vowel formats
+
+  if ( vowel == 1 ) {    // /i/
+    f1 = 260 ; 
+    f2 = 2200 ; 
+    } 
+  if ( vowel == 2 ) {    // /u/
+    f1 = 310 ; 
+    f2 = 900 ; 
+    } 
+  if ( vowel == 3 ) {    // /a/
+    f1 = 750 ; 
+    f2 = 1100 ; 
+    } 
+  if ( vowel == 4 ) {    // /E/
+    f1 = 550 ; 
+    f2 = 1750 ; 
+    } 
+  if ( ! oldf1 ) {      // initialization for note startup
+    tcount = ratio;
+    oldf1 = f1 ; 
+    curf1 = f1 ; 
+    oldf2 = f2 ; 
+    curf2 = f2 ; 
+    } 
+  if ( f1 != oldf1 || f2 != oldf2 ) {  // computes smooth format shift
+    curf1 = oldf1 + ct / trans * ( f1 - oldf1 ) ; 
+    curf2 = oldf2 + ct / trans * ( f2 - oldf2 ) ; 
+    ct = ct + 1 / k_rate ;
+    tcount = tcount - 1; 
+    } 
+  if ( tcount == 0 ) {  // terminus of format shift
+    ct = 0 ; 
+    oldf1 = f1 ; 
+    oldf2 = f2 ;
+    tcount = ratio; 
+    } 
+
+  // a-rate
+
+  // vibrato'd singing frequency
+  vibfreq = cpspitch * ( oscil ( vib , 5 , - 1 ) * 0.020000 + 1 ) / 2 + arand ( 5 ) ;
+
+  if (!fast)  // computes raw glottal waveform
+   { 
+     a = amp * buzz ( vibfreq , 0 , 1 , 0.800000 ) ; 
+   }
+  else
+   {
+     a = amp * oscil ( buzztable, vibfreq ) ; 
+   }
+
+  // apply resonances
+  // note bandpass is non-normative, will sound different with 
+  // different decoders
+
+  reson1 = bandpass ( a , curf1 , curf1 / 5.500000 ) ; 
+  reson2 = bandpass ( a , curf2 , curf2 / 5.500000 ) ; 
+
+  // blended final output
+
+  out = ( a / 4 + reson1 + reson2 ) / 2 ; 
+  output ( out ) ; 
+
+  } 
+

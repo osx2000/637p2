@@ -1,0 +1,240 @@
+
+// gliss.saol
+// Glissandos driver by SASL and MIDI control drivers
+// Originally written by Eric Scheirer
+// Modified by John Lazzaro
+
+
+global { 
+  interp 0;
+  srate 44100; 
+  krate 1050; 
+  outchannels 2; 
+  ksig rvb_on, distance,pedal;
+  table pno (sample, - 1, "samp_1.aif"); 
+  route (dry, piano); 
+  route (dry, spiano); 
+  send (schroeder; 2.500000; dry); 
+  } 
+ 
+//
+// instr spiano
+//
+// sample player of global table -- for SASL control driver
+//
+
+instr spiano (pitch, vel) { 
+  ivar cps, cpsbase, scale, t, blend; 
+  ksig kamp, localtime, segment, peak, sustain, first; 
+  asig samp, lpf; 
+  table pitchmap (lineseg, 201, 0, 0, 36, 0, 60, 1, 200, 1); 
+  imports exports table pno;
+  imports ksig pedal;
+
+  if (! first) { 
+    segment = 1; 
+    first = 1; 
+    } 
+  cps = cpsmidi (pitch);
+  cpsbase =  cpsmidi (48);
+  samp = loscil (pno, cps, cpsbase, 151848); 
+  lpf = lopass (samp, cps * 2); 
+  blend = tableread (pitchmap, pitch); 
+  samp = (1 - blend) * samp + blend * lpf; 
+  scale = (vel / 128) * (vel / 128); 
+  localtime = localtime + 1 / k_rate; 
+  if (segment == 1) { 
+    if (localtime < 0.010000) { 
+      kamp = kline (0, 0.010000, scale); 
+      peak = kamp; 
+      } 
+    else { 
+      segment = 2; 
+      } 
+    } 
+  if (segment == 2) { 
+    kamp = kline (scale, 10.000000, 0); 
+    peak = kamp; 
+    if (localtime > 10.000000) { 
+      segment = 4; 
+      turnoff; 
+      } 
+    } 
+  if (released && segment < 3) { 
+    if (pedal > 40) { 
+      segment = 3; 
+      extend (10.000000); 
+      } 
+    else { 
+      segment = 4; 
+      sustain = peak; 
+      localtime = 0; 
+      extend (0.100000); 
+      } 
+    } 
+  if (segment == 3) { 
+    if (pedal <= 40) { 
+      segment = 4; 
+      localtime = 0; 
+      } 
+    else { 
+      kamp = var_kline (peak, 10.000000, 0); 
+      sustain = kamp; 
+      if (localtime >= 10.000000) { 
+        turnoff; 
+        } 
+      } 
+    } 
+  if (segment == 4) { 
+    kamp = var_kline (sustain, 0.100000, 0); 
+    if (localtime >= 0.100000) { 
+      turnoff; 
+      } 
+    } 
+  output (samp * kamp * (1 - pitch / 100), samp * kamp * (pitch / 100)); 
+  } 
+
+//
+// instr piano
+//
+// sample player of global table -- for MIDI control driver
+//
+
+instr piano (pitch, vel) preset 0 { 
+  ivar cps, cpsbase, scale, t, blend; 
+  ksig kamp, localtime, segment, peak, sustain, first; 
+  asig samp, lpf; 
+  table pitchmap (lineseg, 201, 0, 0, 36, 0, 60, 1, 200, 1); 
+  imports exports table pno;
+
+  if (! first) { 
+    segment = 1; 
+    first = 1; 
+    } 
+  cps = cpsmidi (pitch);
+  cpsbase =  cpsmidi (48);
+  samp = loscil (pno, cps, cpsbase, 151848); 
+  lpf = lopass (samp, cps * 2); 
+  blend = tableread (pitchmap, pitch); 
+  samp = (1 - blend) * samp + blend * lpf; 
+  scale = (vel / 128) * (vel / 128); 
+  localtime = localtime + 1 / k_rate; 
+  if (segment == 1) { 
+    if (localtime < 0.010000) { 
+      kamp = kline (0, 0.010000, scale); 
+      peak = kamp; 
+      } 
+    else { 
+      segment = 2; 
+      } 
+    } 
+  if (segment == 2) { 
+    kamp = kline (scale, 10.000000, 0); 
+    peak = kamp; 
+    if (localtime > 10.000000) { 
+      segment = 4; 
+      turnoff; 
+      } 
+    } 
+  if (released && segment < 3) { 
+    if (MIDIctrl[64] > 40) { 
+      segment = 3; 
+      extend (10.000000); 
+      } 
+    else { 
+      segment = 4; 
+      sustain = peak; 
+      localtime = 0; 
+      extend (0.100000); 
+      } 
+    } 
+  if (segment == 3) { 
+    if (MIDIctrl[64] <= 40) { 
+      segment = 4; 
+      localtime = 0; 
+      } 
+    else { 
+      kamp = var_kline (peak, 10.000000, 0); 
+      sustain = kamp; 
+      if (localtime >= 10.000000) { 
+        turnoff; 
+        } 
+      } 
+    } 
+  if (segment == 4) { 
+    kamp = var_kline (sustain, 0.100000, 0); 
+    if (localtime >= 0.100000) { 
+      turnoff; 
+      } 
+    } 
+  output (samp * kamp * (pitch / 100), samp * kamp * (1 - pitch / 100)); 
+  } 
+
+//
+// opcode var_kline -- helper routine for piano
+//
+
+kopcode var_kline (ksig st, ksig t, ksig e) { 
+  ksig ltime, val; 
+  val = ltime / t * (e - st) + st; 
+  ltime = ltime + 1 / k_rate; 
+  return (val); 
+  } 
+
+//
+// instr schroeder
+//
+// stereo reverb, uses comb and allpass sections
+//
+
+instr schroeder (rt)  {
+  ksig first, ki, d2; 
+  asig in, ap1, ap2; 
+  asig c [ 4 ]; 
+  asig outL, outR; 
+  ivar t [ 4 ], revgain [ 4 ], i; 
+  table timeconst (data, 5, 0.030000, 0.034300, 0.039300,
+                               0.045000, 0.000000); 
+  imports exports ksig rvb_on, distance; 
+  oparray comb [ 4 ]; 
+  
+  in = input[0] + input[1]; 
+  if (first == 0) { 
+    rvb_on = 1; 
+    first = 1; 
+    distance = 1.000000; 
+    } 
+  d2 = distance * distance; 
+  i = 0; 
+  while (i < 4) { 
+    t [ i ] = tableread (timeconst, i); 
+    revgain [ i ] = combgain (t [ i ], rt); 
+    i = i + 1; 
+    } 
+  if (rvb_on) { 
+    ap1 = allpass (in / distance, 0.001700, 0.700000); 
+    ap2 = allpass (ap1, 0.005000, 0.700000); 
+    c[0] = comb(ap2, t[0], revgain[0]); 
+    c[1] = comb(ap2, t[1], revgain[1]); 
+    c[2] = comb(ap2, t[2], revgain[2]); 
+    c[3]=  comb(ap2, t[3], revgain[3]); 
+    outL = (c[0] + c[1] + c[2] + c[3]) / 4; 
+    outR = (c[0] - c[1] + c[2] - c[3]) / 4; 
+    output (input[0] / d2 + outL, input[1] / d2 + outR); 
+    } 
+  else { 
+    output (input); 
+    } 
+  } 
+
+//
+// opcode combgain
+//
+// helper routine for schroeder
+//
+
+opcode combgain (xsig t, xsig rt) { 
+  xsig temp; 
+  temp = exp (log (10) * - 3 * t / rt); 
+  return (temp); 
+  } 

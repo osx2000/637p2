@@ -1,0 +1,188 @@
+
+//
+// This file: sfront test program, exercises many parts of Structured Audio spec
+// This license also covers the SASL file in this directory.
+//
+//
+// Copyright (c) 1999-2006, Regents of the University of California
+// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met:
+//
+//  Redistributions of source code must retain the above copyright
+//  notice, this list of conditions and the following disclaimer.
+//
+//  Redistributions in binary form must reproduce the above copyright
+//  notice, this list of conditions and the following disclaimer in the
+//  documentation and/or other materials provided with the distribution.
+//
+//  Neither the name of the University of California, Berkeley nor the
+//  names of its contributors may be used to endorse or promote products
+//  derived from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+//    Maintainer: John Lazzaro, lazzaro@cs.berkeley.edu
+//
+
+
+
+// min.saol
+// Test program 
+// Written by John Lazzaro
+// song length: 4 seconds
+//
+// Basic goal of this test program is to exercise large
+// parts of the SA language without using any core opcodes
+// or wavetable generators. 
+//
+
+global {
+
+srate 44100;
+krate 100;
+route(trem_bus,square);
+send (tremelo; 2000, 0.01 ; trem_bus);
+sequence (sawtooth, square);
+
+}
+
+//
+// Tremelo unit -- simplest effects unit
+//
+
+instr tremelo (starthalfperiod,startdepth) {
+   asig count;
+   ksig kinit;
+   ksig halfperiod;
+   ksig depth;
+
+   if (!kinit) {
+    kinit = 1;
+    halfperiod = starthalfperiod;
+    depth = startdepth;
+   }
+
+   count = count - 1;
+   if (count > 0) {
+    output((1+depth)*input[0]);}
+   if (count <= 0) {
+    output((1-depth)*input[0]);}
+   if (count < -halfperiod) { 
+    count = halfperiod;}
+}
+
+//
+// instr square
+//
+// Square wave oscillator, launches sawtooth 
+// dynamically
+
+instr square (starthalfperiod) {
+   asig count;
+   ksig kinit;
+   ksig delta;
+   imports ksig halfperiod, stop;
+
+   if (!kinit) {
+    kinit = 1;
+    halfperiod = starthalfperiod;
+   }
+
+   delta = delta + 1;
+   
+   if ((delta == 4) && (halfperiod > 40)) {
+     instr sawtooth (0,dur, halfperiod-1);
+    }
+
+   if (stop) { 
+    turnoff; 
+   }
+   count = count + 1;
+   if (count > 0) {
+     output(0.1);
+   }
+   if (count <= 0) {
+     output(-0.1);
+   }
+   if (count > halfperiod) {
+     count = - halfperiod + 1;
+     }
+
+}
+
+//
+// Sawtooth oscillator, inline
+//
+
+instr sawtooth (starthalfperiod) {
+   asig count;
+   ksig kinit;
+   imports ksig halfperiod, stop;
+
+   if (!kinit) {
+    kinit = 1;
+    halfperiod = starthalfperiod;
+   }
+
+   if (stop) { 
+    turnoff; 
+   }
+   count = count + 1;
+   if (count > halfperiod) {
+     count = - halfperiod + 1;
+   }
+   output(0.1*(count/halfperiod));
+
+}
+
+//
+// Sawtooth oscillator, uses a user-defined
+// opcode.
+//
+
+instr sawtwo(starthalfperiod) {
+   ksig kinit;
+   imports ksig halfperiod, stop;
+
+   if (!kinit) {
+    kinit = 1;
+    halfperiod = starthalfperiod;
+   }
+
+   if (stop) { 
+    turnoff; 
+   }
+   output(count(halfperiod));
+
+}
+
+//
+// Helper opcode for instr sawtwo
+//
+
+aopcode count(ksig halfperiod) {
+
+asig idx;
+
+idx = idx + 1;
+if (idx > halfperiod) {
+  idx = - halfperiod + 1;
+}
+
+
+return (0.1*(idx/halfperiod));
+
+}

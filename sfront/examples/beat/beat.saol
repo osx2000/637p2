@@ -1,0 +1,254 @@
+
+// beat.saol
+// Weird beat-box toy.
+// Originally written by Eric Scheirer
+// Modified by John Lazzaro
+// Song length: 60 seconds
+//
+
+global { 
+  srate 44100 ; 
+  krate 525 ; 
+  outchannels 2 ; 
+
+  sequence ( beat , tabla ) ;
+
+  // route table to mono filt instr and stereo reverb
+  // instr; eq instr mixes reverb and filt outs into 
+  // final stereo outs
+
+  route ( send_bus , tabla ) ; 
+  send ( filter ; 0.350000 , 100 , 800  ; send_bus ) ; 
+  send ( schroeder ; 1.500000 ; send_bus ) ; 
+  route ( mix_bus , filter , schroeder ) ; 
+  send ( mixdown ; ; mix_bus ) ; 
+
+  } 
+
+// instr beat
+//
+// sequences tabla instr in response to sasl table commands
+// all statements k-rate
+
+instr beat ( st_tempo, looseness ) {
+  imports ksig tempo ;              
+  imports ksig accel, acceltime ; 
+  ksig accelgoal, accelstep ; 
+  table prob (data, 16, 99, 20, 85, 20, 99, 20, 90, 20 ) ; 
+  table pcht (data, 16, 20, 30, 40, 30, 50, 30, 40, 30 ) ; 
+  table ampt (data, 16, 3, 0.5, 1.25, 0.5, 2, 0.5, 1.25, 0.5 ) ; 
+  table instt (data, 16, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 ) ; 
+  imports ksig div ; 
+  imports ksig setprob, newprob, setinst, newinst ; 
+  imports ksig change ; 
+  ksig temp_time, ktime, oldtemp, first, pch, amp, inst ; 
+  ksig del, place, p, x ; 
+  imports table newt ; 
+
+
+  // sets current tempo
+  // initial tempo set by launch parameters
+  // ongoing tempo set by accel and acceltime score imports
+  // uses state variables accelgoal, accelstep
+
+  if ( ! first ) { 
+    first = 1 ; 
+    div = 8 ; 
+    tempo = st_tempo ; 
+    del = 0 ; 
+    oldtemp = tempo ; 
+    place = - 1 ; 
+    } 
+  if ( accel ) { 
+    accelgoal = accel ; 
+    accelstep = ( accelgoal - tempo ) / ( acceltime * k_rate ) ; 
+    accel = 0 ; 
+    } 
+  tempo = tempo + accelstep ; 
+  if ( ( accelstep > 0 && tempo >= accelgoal ) ||
+       ( accelstep <= 0 && tempo <= accelgoal ) ) { 
+    accelgoal = 0 ; 
+    accelstep = 0 ; 
+    } 
+  if ( oldtemp != tempo ) { 
+    del = del * oldtemp / tempo ; 
+    oldtemp = tempo ; 
+    } 
+
+  // unexercised by current beat.sasl
+
+  if ( setprob ) { 
+    tablewrite ( prob , setprob , newprob ) ; 
+    setprob = 0 ; 
+    } 
+  if ( setinst ) { 
+    tablewrite ( instt , setinst , newinst ) ; 
+    setinst = 0 ; 
+    } 
+
+  // reads in future table newt, triggered by change import
+  // current beat.sasl exercises prob and pcht only
+  // prob: probability of a note trigger
+  // pcht: pitch of the triggered note
+
+  if ( change ) { 
+    if ( change == 1 ) { 
+      tabcopy ( newt , prob ) ; 
+      } 
+    if ( change == 2 ) { 
+      tabcopy ( newt , pcht ) ; 
+      } 
+    if ( change == 3 ) { 
+      tabcopy ( newt , ampt ) ; 
+      } 
+    if ( change == 4 ) { 
+      tabcopy ( newt , instt ) ; 
+      } 
+    change = 0 ; 
+    } 
+
+  // core loop which launches notes
+  
+  // trigger table instt all 1's and not changed by current
+  // beat.sasl, so it plays no role here
+  //
+
+  del = del - 1 / k_rate ; 
+  if ( del <= 0 ) { 
+    del = 60 / tempo / div * ( 1 + krand ( looseness ) ) ; 
+    place = place + 1 ; 
+    if ( place >= div ) { 
+      place = 0 ; 
+      } 
+    p = tableread ( prob , place ) ; // gets current note probability
+    x = klinrand ( 0 , 1 ) ;         // which is compared against x
+    if ( x < p / 100 ) {             // if new note, get pitch,amp,trigger
+      pch = tableread ( pcht , place ) ; 
+      amp = tableread ( ampt , place / 10 ) * ( 1 + krand ( looseness ) ) ; 
+      inst = tableread ( instt , place ) ; 
+      if ( inst == 1 ) {             // launch if triggered
+        instr tabla ( 0, 0.250000 , pch , amp ) ; 
+        } 
+      } 
+    } 
+  } 
+
+//
+// opcode tabcopy
+//
+// helper routine for beat
+
+kopcode tabcopy ( table src , table dest ) { 
+  ksig i , len ; 
+
+  len = min ( ftlen ( src ) , ftlen ( dest ) ) ; 
+  i = 0 ; 
+  while ( i < len ) { 
+    tablewrite ( dest , i , tableread ( src , i ) ) ; 
+    i = i + 1 ; 
+    } 
+  }
+ 
+//
+// instr tabla
+//
+// only sound-generating instr in beat.saol
+
+instr tabla ( pch , ampl ) { 
+  table t1 ( harm , 1024 , 1 ) ; 
+  ivar p3 , i1 , i2 , i4 ; 
+  ksig k1 ; 
+  asig a1 , mod , env ;
+
+// i-rate
+   
+  p3 = 0.500000 ; 
+  i1 = cpsmidi ( pch ) ; 
+  i2 = p3 / 2 ; 
+
+// k-rate
+
+  k1 = kline ( 1 , 0.025000 , 0 , p3 - 0.025000 , 0 ) ; 
+
+// a-rate
+
+  env = aline ( 1 , i2 , 0 , p3 - i2 , 0 ) ; 
+  mod = oscil ( t1 , i1 , - 1 ) * i1 * k1 * 25 ; 
+  a1 = oscil ( t1 , i1 * 1.400000 + mod , - 1 ) * env * ampl / 16 ; 
+  output ( a1 ) ; 
+
+  } 
+
+// instr filter
+//
+// phaser-like effects instrument: mono out
+//
+
+instr filter ( pd , low , hi ) { 
+  table t1 ( harm , 128 , 1 ) ; 
+  ksig cf ; 
+  asig a ; 
+
+  cf = koscil ( t1 , pd ) * ( hi - low ) / 2 + ( hi - low ) / 2 + low ; 
+  a = bandpass ( input [ 0 ] , cf , cf / 5 ) ; 
+  output ( a ) ; 
+  } 
+
+
+// opcode combgain
+//
+// helper routine for schroeder
+//
+
+opcode combgain ( xsig t , xsig rt ) { 
+   return ( exp ( log ( 10 ) * - 3 * t / rt ) ) ; 
+   } 
+
+
+// instr schroeder
+//
+// stereo reverb, output is wet-only
+//
+
+instr schroeder ( rt ) { 
+  asig ap1 , ap2 ; 
+  asig c1 , c2 , c3 , c4 ; 
+  asig outL , outR ; 
+  ivar w1, w2, w3, w4;
+
+// i-rate
+
+  w1 = combgain ( 0.030000 , rt );
+  w2 = combgain ( 0.034300 , rt );
+  w3 = combgain ( 0.039300 , rt );
+  w4 = combgain ( 0.045000 , rt );
+
+// a-rate
+
+  ap1 = allpass ( input [ 0 ] , 0.001700 , 0.700000 ) ; 
+  ap2 = allpass ( ap1 , 0.005000 , 0.700000 ) ; 
+  c1 = comb ( ap2 , 0.030000 , w1 ) ; 
+  c2 = comb ( ap2 , 0.034300 , w2 ) ; 
+  c3 = comb ( ap2 , 0.039300 , w3 ) ; 
+  c4 = comb ( ap2 , 0.045000 , w4 ) ; 
+  outL = ( c1 + c2 + c3 + c4 ) / 4 ; 
+  outR = ( c1 - c2 + c3 - c4 ) / 4 ; 
+  output ( outL , outR ) ; 
+  } 
+
+// instr mixdown
+//
+// mixes reverb and filt into stereo outs
+//
+
+instr mixdown ( ) { 
+  asig revL, revR, filt;
+  
+  filt = input [ 0 ];
+  revL = input [ 1 ];
+  revR = input [ 2 ];
+
+  output ( 0.6*revL + filt , 0.8*revR ) ; 
+  } 
+
+

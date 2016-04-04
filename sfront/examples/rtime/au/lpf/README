@@ -1,0 +1,23 @@
+
+LPF, a low-pass filter with resonance, is an Effect AudioUnit with a
+custom UI view.  The signal processing code is written in SAOL.  The
+view code, contained in the CocoaFilterView subdirectory, is written
+in Objective-C.  The view code is a modified version of the view for
+the FilterDemo sample AU that ships with the Apple SDK.  The signal
+processing code was written in SAOL, to match the behavior of the
+original Apple C++ code.
+
+lpf.saol is described in Part V/4 of the MP4SA book shipped with this 
+distribution.
+
+The make commands for this example are:
+
+ "make":  Creates a AU component from your SAOL file in this directory
+ "make install": Installs your plug-in and launches an AU host for testing
+ "make clean": Removes all files created by "make" from this directory
+ "make remove": Un-installs your plugin, and does a "make clean"
+
+Note that the Makefile in this directory calls CocoaFilterView/Makefile 
+to build the Cocoa view bundle.  However, all make variables are set in 
+the Makefile in this directory, and are passed to CocoaFilterView/Makefile.  
+Thus, you (hopefully) should not have to edit CocoaFilterView/Makefile.

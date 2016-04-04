@@ -1,0 +1,193 @@
+
+// claps.saol
+// An applause synthesizer
+// Originally written by Eric Scheirer
+// Modified by John Lazzaro
+// Song length: 25 seconds
+//
+
+global { 
+  srate 22050 ; 
+  krate 441 ; 
+  outchannels 2 ; 
+  table oneclap ( sample , -1 , "samp_1.aif") ; 
+
+// routes all claps to stereo reverb unit
+
+  route ( rvb_bus , clap ) ; 
+  send ( schroeder ; 1 ; rvb_bus ) ; 
+
+  } 
+
+// instr schroeder
+//
+// simple reverberator
+//
+
+instr schroeder ( rt ) { 
+  asig ap1 , ap2 ; 
+  asig c1 , c2 , c3 , c4 ; 
+  asig outL , outR ; 
+  ivar w1, w2, w3, w4;
+
+  ap1 = allpass ( input [ 0 ] , 0.001700 , 0.700000 ) ; 
+  ap2 = allpass ( ap1 , 0.005000 , 0.700000 ) ; 
+  w1 = combgain ( 0.030000 , rt );
+  w2 = combgain ( 0.034300 , rt );
+  w3 = combgain ( 0.039300 , rt );
+  w4 = combgain ( 0.045000 , rt );
+
+  c1 = comb ( ap2 , 0.030000 , w1 ) ; 
+  c2 = comb ( ap2 , 0.034300 , w2 ) ; 
+  c3 = comb ( ap2 , 0.039300 , w3 ) ; 
+  c4 = comb ( ap2 , 0.045000 , w4 ) ;
+ 
+  outL = ( c1 + c2 + c3 + c4 ) / 4 ; 
+  outR = ( c1 - c2 + c3 - c4 ) / 4 ; 
+  output ( input [ 0 ] + outL , input [ 0 ] + outR ) ; 
+
+  } 
+
+// instr clap
+//
+// plays a single randomized hand clap
+//
+
+instr clap ( amp , x , y ) { 
+  ivar shift , outamp ; 
+  ksig sh, onelen;
+  imports exports table oneclap ; 
+
+// i-rate 
+
+  shift = 1 + irand ( 0.200000 ) ; 
+  outamp = amp * ( 1 + irand ( 0.500000 ) ) / 3 ; 
+
+// k-rate
+  sh = (ftsr ( oneclap ) * shift ) / s_rate;
+  onelen = ftlen(oneclap);
+  
+// a-rate
+
+  output ( doscil_shift ( oneclap , sh, onelen ) * outamp ) ; 
+
+  } 
+
+// instr multi_clap
+//
+// plays a short cluster of claps
+//
+
+instr multi_clap ( num , amp , x ) { 
+  table delayt ( random , 20 , 3 , 0.010000 ) ; 
+  ksig ct , t , st ; 
+
+// all k-rate -- launches notes, doesn't create sound
+
+  ct = 0 ; 
+  while ( ct < num ) { 
+    st = tableread ( delayt , ct ) ; 
+    if ( ( st < t ) && ( st + 1 / k_rate > t ) ) { 
+      instr clap ( 0, 0.250000 , amp / 2 , 0 , 0 ) ; 
+      } 
+    ct = ct + 1 ; 
+    } 
+  t = t + 1 / k_rate ; 
+
+  }
+ 
+// instr applause
+//
+// plays sustained audience applause
+//
+
+instr applause ( pmax , amp , decay ) { 
+  ksig prn , kct , new , kphase [ 50 ] , kinit , cur_ppl ; 
+  ivar pd [ 50 ] , mppl , ct , klast ;
+
+// i-rate initializes probability table
+ 
+  mppl = pmax * 50 ; 
+  while ( ct < mppl ) { 
+    pd [ ct ] = ilinrand ( 1.500000 , 3 ) ; 
+    ct = ct + 1 ; 
+    } 
+
+// k-rate, launches notes
+
+  prn = kline ( 0 , dur / 5 , pmax , dur - ( dur / 5 + decay ) , 
+                pmax , decay , 0 ) ;  // envelope of applause
+
+ 
+  if ( prn > 0.400000 ) { 
+
+// triggers dense clapping
+
+    prn = (1/prn)*((0.1*s_rate)/(k_rate*k_rate));
+    if ( kpoissonrand ( prn ) ) { 
+      instr clap ( 0, 0.100000 , amp / ( kexprand ( 1 ) + 0.800000 ) ,
+                   0 , 0 ) ; 
+      } 
+    } 
+  else { 
+
+// triggers buildup and falloff -- needs improvement
+
+    cur_ppl = prn * 50 ; 
+    if ( ! kinit ) {   
+      kinit = 1 ; 
+      while ( kct < cur_ppl ) {  // dead code -- never gets executed 
+        kphase [ kct ] = klinrand ( 0 , 1 ) ; 
+        kct = kct + 1 ; 
+        } 
+      } 
+    kct = 0 ; 
+    while ( kct < cur_ppl ) { 
+      kphase [ kct ] = kphase [ kct ] + 1 / k_rate * pd [ kct ] ; 
+      if ( kphase [ kct ] > 1 ) { 
+        kphase [ kct ] = kphase [ kct ] - 1 ; 
+        instr clap ( 0, 0.100000 , amp / ( kexprand ( 1 ) + 0.800000 ) ,
+          0 , 0 ) ; 
+        } 
+      kct = kct + 1 ; 
+      } 
+    } 
+  } 
+
+//
+// opcode doscil_shift 
+// 
+// randomized sample player
+//
+
+aopcode doscil_shift ( table t , ksig sh , ksig tlen) { 
+  asig idx , fl , cl , x1 , x2 ; 
+
+  idx = idx + sh ; 
+  fl = int ( idx ) ; 
+  cl = int ( idx + 1 ) ; 
+  if ( fl >= tlen ) { 
+    return ( 0 ) ; 
+    } 
+  else { 
+    x1 = tableread ( t , fl ) ; 
+    if ( cl < tlen ) { 
+      x2 = tableread ( t , cl ) ; 
+      } 
+    else { 
+      x2 = tableread ( t , 0 ) ; 
+      } 
+    return ( ( idx - fl ) * ( x2 - x1 ) / ( cl - fl ) + x1 ) ; 
+    } 
+  } 
+
+//
+// opcode combgain
+//
+// helper routine for reverberation
+//
+
+opcode combgain ( xsig t , xsig rt ) { 
+  return ( exp ( log ( 10 ) * - 3 * t / rt ) ) ; 
+  } 
+

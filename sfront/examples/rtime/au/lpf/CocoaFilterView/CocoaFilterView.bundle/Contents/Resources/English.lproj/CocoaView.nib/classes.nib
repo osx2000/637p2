@@ -1,0 +1,24 @@
+{
+    IBClasses = (
+        {CLASS = "UCBLopassFilter_GraphView"; LANGUAGE = ObjC; SUPERCLASS = NSView; }, 
+        {
+            ACTIONS = {cutoffFrequencyChanged = id; resonanceChanged = id; }; 
+            CLASS = "UCBLopassFilter_UIView"; 
+            LANGUAGE = ObjC; 
+            OUTLETS = {
+                cutoffFrequencyField = NSTextField; 
+                graphView = "UCBLopassFilter_GraphView"; 
+                resonanceField = NSTextField; 
+            }; 
+            SUPERCLASS = NSView; 
+        }, 
+        {
+            CLASS = "UCBLopassFilter_ViewFactory"; 
+            LANGUAGE = ObjC; 
+            OUTLETS = {uiFreshlyLoadedView = "UCBLopassFilter_UIView"; }; 
+            SUPERCLASS = NSObject; 
+        }, 
+        {CLASS = FirstResponder; LANGUAGE = ObjC; SUPERCLASS = NSObject; }
+    ); 
+    IBVersion = 1; 
+}
