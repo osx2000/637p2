@@ -32,8 +32,8 @@ int   *b, LR[2], brk, frames, harms, Nbk;
 int  findBreak();
 void findLR(int Nbk);
 void interpolate(int L, int R);
-void makeSAOL(char *fname);
-void makeSASL(char *fname); 
+void makeSAOL(char *filename);
+void makeSASL(char *filename); 
 int compare_ints (const void *a, const void *b);
 
 int main(int argc, char **argv)
@@ -110,6 +110,31 @@ int main(int argc, char **argv)
   free(ampData); free(timeData);
 }
 
+void makeSASL (char *filename) {
+  FILE *fp;
+  char env[harms][6], y[harms][4];
+  char instr[6]; char fname[11];
+
+  // create instr name & output file name
+  memcpy(instr,filename,5); instr[5] = '\0';
+  memcpy(fname,filename,5); fname[5] = '\0';
+  strcat(fname,".sasl"); fname[10] = '\0';
+  fname[0] = tolower(fname[0]); instr[0] = tolower(instr[0]);
+
+  // open/create output file
+  if (!(fp = fopen(fname,"w+"))) {
+    P("Error opening/creating SASL file\n");
+    exit(1);
+  }
+
+  // 0.0 <instr name> <endtime> <frequency>
+  // <endtime> end
+  fprintf(fp,"0.0 %s %.2f %.0f\n%.2f end\n", instr, tl, fa, tl);
+
+  P("%s file created\n",fname);
+  fclose(fp);
+}
+
 void makeSAOL (char *filename) {
   int i,k;
   FILE *fp;
@@ -135,8 +160,8 @@ void makeSAOL (char *filename) {
   }
 
   // write formatted text and data to file
-  fprintf(fp,"global {\n table cyc(harm,128,1);\n srate %f;\n}\n\n",22050.0);//*sample rate 22050*
-  fprintf(fp,"instr %s (fr) {\n imports exports table cyc;\n\n ivar scalar;\n ksig ",instr);
+  fprintf(fp,"global {\n table cyc(harm,128,1);\n srate 44100;\n}\n\n");//*sample rate 22050*
+  fprintf(fp,"instr %s (fr) {\n imports exports table cyc;\n\n ksig ",instr);
   for (k=0;k<harms;k++) {
     if (k==harms-1)
       fprintf(fp, "%s;\n\n asig ",env[k]);
@@ -179,16 +204,6 @@ void makeSAOL (char *filename) {
 
   P("%s file created\n",fname);
   fclose(fp);
-}
-
-void makeSASL (char *fname) {
-  FILE *fp;
-
-  // creates output filename
-  char instr[11]; memcpy(instr,fname,5); 
-  strcat(instr,".sasl"); instr[10] = '\0';
-  instr[0] = tolower(instr[0]);
-
 }
 
 // finds breaks based on largest margin of error
