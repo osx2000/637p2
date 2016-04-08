@@ -1,0 +1,285 @@
+
+// pc.saol
+// "Three brief impressions #2", P. Child (arr. E.Scheirer)
+// Originally written by Eric Scheirer
+// Modified by John Lazzaro
+//
+// Comments:
+//
+// [1] saolc implementation of octpch() has a subtle bug --
+//     roundoff problems result in cpspch(8) == cpspch(8.01),
+//     resulting in notes being off a semitone. As a result,
+//     some smallgong/medgong notes will be incorrect pitch.
+//
+// [2] smallgong/medgong relies on buzz(X,X,X,1) == 0, as a
+//     side effects of scale(rolloff=1) = 0/0 in its definition
+//     in the FDIS. 
+//
+// [3] round-off prone calculation in kline() in instr medgong --
+//     adjusted constant 0.1 downward to compensate.
+//
+
+global { 
+  interp 1;
+  srate 44100 ; 
+  krate 1050 ; 
+  outchannels 2 ; 
+
+  table t1 ( harm , 2048 , 1 ) ; 
+
+  // celeste, tabla, small/medgong all use outbus 
+  // statements to write directly to rvb bus
+  route(rvb, dummy);
+  send ( schroeder ; 2.500000 ; rvb[1] ) ; 
+  sequence ( celeste , schroeder ) ; 
+  sequence ( tabla , schroeder ) ; 
+  sequence ( smallgong , schroeder ) ; 
+  sequence ( medgong , schroeder ) ; 
+  ivar gi4 , gi5 ; 
+  } 
+
+//
+// instr dummy
+//
+
+instr dummy ()
+{
+  output(0);
+}
+
+//
+// instr celeste
+//
+
+instr celeste ( xp6 , pch , ampl , pan , damper , atten ) { 
+  imports table t1 ; 
+  ivar i1 , i4 , cps , p3 ; 
+  ksig first ; 
+  asig a1 , a2 ; 
+
+
+  // i-rate 
+
+  xp6 ; 
+  ampl = ampl / 32767 ; 
+  i1 = cpspch ( pch ) ; 
+  if ( damper == 0 ) { 
+    p3 = 0.500000 ; 
+    } 
+  else { 
+    p3 = damper ; 
+    } 
+  i4 = frac ( pan ) * 10 ; 
+  ampl = ampl / 16 ; 
+
+  // k-rate
+
+  if ( ! first && dur < p3 ) { 
+    first = 1 ; 
+    extend ( p3 - dur ) ; 
+    } 
+
+  // a-rate
+
+  a2 = aexpon ( 0.01, 0.01, 1 , 0.2, 0.01, p3 , 0.001) ; 
+  a1 = bandpass ( arand ( ampl ) , 200 + ( i1 - 200 ) / 2 , 5 ) * a2 ; 
+  a2 = aline ( 0 , 0.015, ampl , p3 - 0.15, 0 ) ; 
+  a2 = oscil ( t1 , i1 , - 1 ) * a2 ; 
+  a1 = a1 + a2 ; 
+
+  output ( i4 * a1 , ( 4 - i4 ) * a1 ) ; 
+  outbus ( rvb , a1 * atten ) ; 
+
+  } 
+
+//
+// instr tabla
+//
+
+instr tabla ( xp6 , pch , ampl , atten , pan ) { 
+  imports table t1 ; 
+  ivar p3 , i1 , i2 , i4 ; 
+  ksig k1 ; 
+  asig a1 , mod , env ;
+
+  // i-rate 
+ 
+  p3 = 0.500000 ; 
+  xp6 ; 
+  i1 = cpspch ( pch ) ; 
+  ampl = ampl / 32767 ; 
+  i2 = p3 / 2 ; 
+  i4 = frac ( pan ) * 10 ; 
+
+  // k-rate 
+
+  k1 = kline ( 1 , 0.025000 , 0 , p3 - 0.025000 , 0 ) ; 
+
+  // a-rate 
+
+  env = aline ( 1 , i2 , 0 , p3 - i2 , 0 ) ; 
+  mod = oscil ( t1 , i1 , - 1 ) * i1 * k1 * 25 ; 
+  a1 = oscil ( t1 , i1 * 1.400000 + mod , - 1 ) * env * ampl / 16 ; 
+  output ( i4 * a1 , ( 4 - i4 ) * a1 ) ; 
+  outbus ( rvb , a1 * 4 * atten ) ; 
+
+  } 
+
+//
+// instr smallgong
+//
+
+instr smallgong ( xp6 , p5 , p6 , p7 , p8 , p9 , p10 , p11, p12 ) { 
+  imports table t1 ; 
+  ivar i1 , i4 , i5 , p3 ; 
+  ksig k1 , k2 , k3 ; 
+  asig a1 , a2 , a3 ;
+
+  // i-rate
+ 
+  xp6 ; 
+  i1 = octpch ( p5 ) ; 
+  i4 = frac ( p12 ) * 10 ; 
+  p6 = p6 / 32000 ; 
+  i5 = int ( s_rate / ( 2 * cpspch ( p5 ) ) ) ; 
+  p3 = 1.500000 ; 
+
+  // k-rate
+
+  if ( p8 != 1 ) { 
+    k1 = kexpon ( 0.010000 , 0.075000 , 1 , p3 - 0.075000 , 0.010000 ) ; 
+    } 
+  else { 
+    k1 = kexpon ( 1 , p3 , 0.010000 ) ; 
+    } 
+  k1 = k1 * p6 ; 
+  k2 = kexpon ( p8 - 0.001, p3 , p9 ) ; 
+  k3 = koscil ( t1 , p11, - 1 ) * 0.250000 ;
+
+  // a-rate 
+ 
+  a1 = oscil ( t1 , cpsoct ( ( i1 / 3 ) + k3 ) , - 1 ) ; 
+  a2 = buzz ( cpsoct ( i1 ) , i5 , p7 - 1 , k2 ) ; 
+  a1 = ( 1 + a1 ) * a2 * k1 ; 
+  a1 = a1 / 16 ; 
+  output ( i4 * a1 , ( 4 - i4 ) * a1 ) ; 
+  outbus ( rvb , p10 * a1 ) ; 
+
+  } 
+
+//
+// instr medgong
+//
+
+instr medgong ( p4 , p5 , p6 , p7 , p8 , p9 , p10 , p11 , p12 , p13 ) { 
+  asig a1 , a2 , a3 , a4 , a5 , a6 ; 
+  ksig k1 , k2 , k3 , k4 ; 
+  ivar p3 , i1 , i2 , i3 , i4 , i5 , i6 , i7 , i8 , i9 ; 
+  imports table t1 ; 
+  imports exports ivar gi4 , gi5 ;
+
+  // i-rate 
+ 
+  p3 = dur ; 
+  p6 = p6 / 32000 ; 
+  p6 = p6 / 32 ; 
+  i1 = octpch ( p5 ) ; 
+  if ( p4 > 1 ) { 
+    i2 = 1 ; 
+    } 
+  else { 
+    i2 = 0 ; 
+    } 
+  i3 = p4 - 2 * i2 ; 
+  if ( i2 <= 0 ) { 
+    i4 = i1 ; 
+    i5 = 0.001000 * p6 ; 
+    gi4 = i4 ; 
+    gi5 = i5 ; 
+    } 
+  else { 
+    i4 = gi4 ; 
+    i5 = gi5 ; 
+    } 
+  if ( i3 == 1 ) { 
+    i6 = 0.200000 ; 
+    } 
+  else { 
+    i6 = 0.001000 ; 
+    } 
+  i8 = frac ( p13 ) * 10 ; 
+  i9 = int ( 20000 / ( 2 * cpspch ( p5 ) ) ) ; 
+  i4 = i1 ; 
+  i5 = 0.200000 * p6 ; 
+
+  // k-rate 
+
+  k2 = kexpon ( p8 - 0.001, p3 , p9 ) ; 
+  if ( p8 != 1 ) { 
+    k4 = kline ( i4 , 0.100000 , i1 , p3 - 0.099 , i1 ) ; 
+    } 
+  if ( p8 != 0.010000 ) { 
+    k4 = i1 ; 
+    } 
+
+  // a-rate 
+
+  if ( p8 != 1 ) { 
+    if ( p3 <= 0.175000 ) { 
+      a6 = aexpon (i5, 0.075, p6, p3 - 0.175, p11 * p6, 0.1, i6 * p6); 
+      } 
+    else { 
+      a6 = aexpon (i5, p3/2, p6, p3/2, i6 * p6) ; 
+      } 
+    } 
+  else { 
+    a6 = aexpon (p6, p3, 0.001*p6) ; 
+    } 
+
+  // a-rate
+
+  a1 = oscil ( t1 , 0.7 * cpsoct ( i1 ) , - 1 ) ; 
+  a2 = buzz ( cpsoct ( k4 ) , i9 , ( p7 - 1 ) , k2 ) * a6 ; 
+  a3 = buzz ( p12 + cpsoct ( k4 ) , i9 , ( p7 - 1 ) , k2 ) * a6 ; 
+  a1 = ( a2 + a3 ) * ( 1 + a1 ) ; 
+  output ( i8 * a1 , ( 4 - i8 ) * a1 ) ; 
+  outbus ( rvb , a1 * p10 ) ; 
+
+  } 
+
+// opcode combgain
+//
+// helper routine for reverb
+//
+
+opcode combgain ( xsig t , xsig rt ) { 
+  return ( exp ( log ( 10 ) * - 3 * t / rt ) ) ; 
+  } 
+
+// instr schroder
+//
+// stereo reverb unit
+//
+
+instr schroeder ( rt ) { 
+  asig ap1 , ap2 ; 
+  asig c1 , c2 , c3 , c4; 
+  asig outL, outR ; 
+  ivar w1, w2, w3, w4;
+
+  w1 = combgain ( 0.030000 , rt );
+  w2 = combgain ( 0.034300 , rt );
+  w3 = combgain ( 0.039300 , rt );
+  w4 = combgain ( 0.045000 , rt );
+
+  ap1 = allpass ( input [ 0 ] , 0.001700 , 0.700000 ) ; 
+  ap2 = allpass ( ap1 , 0.005000 , 0.700000 ) ; 
+  c1 = comb ( ap2 , 0.030000 , w1 ) ; 
+  c2 = comb ( ap2 , 0.034300 , w2 ) ; 
+  c3 = comb ( ap2 , 0.039300 , w3 ) ; 
+  c4=  comb ( ap2 , 0.045000 , w4 ) ; 
+  outL = ( c1 + c2 + c3 + c4) / 4 ; 
+  outR = ( c1 - c2 + c3 - c4) / 4 ; 
+  output (outL, outR ) ; 
+  } 
+

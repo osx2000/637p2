@@ -1,0 +1,132 @@
+
+//
+// AudioUnit Effect (aufx) example
+// Adds a noise signal to input audio
+//
+
+
+global {
+  srate 44100;    // AU Host may change this value
+  krate 100;
+
+  // stereo in, stereo out
+  
+  inchannels 2;   // If AU Host requests mono in, the stereo input we
+                  // see has identical samples in left and right channels.
+
+  outchannels 2;  // If AU Host requests mono out, our stereo output is
+                  // converted to mono "on the way back" to the AU host.
+
+  // sets internal routing diagram for the audiounit:
+  // input_bus -> addnoise instr -> output_bus
+
+  send (addnoise; ; input_bus); 
+
+  // Parameters shown in AudioUnit User Interface
+  // Order of appearance sets parameter order for Factory Presets
+
+  ksig aup_Input_Volume;  // underscores become spaces in the UI
+  ksig aup_Hiss_Volume;
+  ksig aup_Random_Mode;
+
+  // Sets the user-interface widget for each parameter
+  //
+  // Options: slider,            slider_linear, 
+  //          slider_log,        slider_exp,
+  //          slider_squareroot, slider_squarelaw,
+  //          slider_cuberoot,   slider_cubic,
+  //          menu,              checkbox,
+  //          display_menu, display_checkbox, display_number
+
+  ksig aup_Input_Volume_slider_linear;
+  ksig aup_Hiss_Volume_slider_linear;
+  ksig aup_Random_Mode_menu;
+
+  // Sets the unit to display next to the slider
+  // Units are not used for checkbox and menu widgets
+
+  ksig aup_Input_Volume_unit_dB; 
+  ksig aup_Hiss_Volume_unit_dB;
+
+  // "Random Mode" displays a pop-up menu, whose text labels are coded below
+
+  ivar aup_Random_Mode_idx0_Wide_Gaussian;    // "0" displays "Wide Gaussian"
+  ivar aup_Random_Mode_idx2_Uniform;          // "2" displays "Uniform"
+  ivar aup_Random_Mode_idx1_Narrow_Gaussian;  // "1" displays "Narrow Gaussian"
+
+  // Parameter info                     min  default  max
+
+  table aup_Input_Volume_pinfo(data, 3, -40,  -6,     0);
+  table aup_Hiss_Volume_pinfo(data,  3, -40,  -6,     0);
+  table aup_Random_Mode_pinfo(data,  3,   0,   0,     2); // "Wide Gaussian" default
+  
+  // Factory Preset Tables           Input dB    Hiss dB    Mode Idx  
+
+  table aup_factory_No_Noise(data, 3,    -6,      -40,        0);
+  table aup_factory_No_Signal(data, 3,  -40,       -6,        0);
+  table aup_factory_Balanced(data, 3,    -6,       -6,        0);
+}
+
+
+// instr addnoise adds a noise signal to input[] audio
+
+instr addnoise () {
+
+  imports exports ksig aup_Input_Volume; // matches globals
+  imports exports ksig aup_Hiss_Volume;
+  imports exports ksig aup_Random_Mode;
+
+  ksig hiss_db_last, hiss_linear;        // noise configuration state
+  ksig input_db_last, input_linear;
+  
+
+  // **********************
+  // computed during k-pass
+  // **********************
+
+  // ampdb() is expensive, so we only do it when AU parameters change
+
+  if (itime)
+    {
+      if (hiss_db_last != aup_Hiss_Volume)
+	{
+	  hiss_db_last = aup_Hiss_Volume;
+	  hiss_linear = ampdb(90 + hiss_db_last);
+	}
+      if (input_db_last != aup_Input_Volume)
+	{
+	  input_db_last = aup_Input_Volume;
+	  input_linear = ampdb(90 + input_db_last);
+	}
+    }
+  else
+    {
+      hiss_db_last = aup_Hiss_Volume;
+      hiss_linear = ampdb(90 + hiss_db_last);
+      input_db_last = aup_Input_Volume;
+      input_linear = ampdb(90 + input_db_last);
+    }
+
+ 
+  // **********************
+  // computed during a-pass
+  // **********************
+
+  // Random Mode selects different noise functions
+
+  if (aup_Random_Mode == 2)
+    {
+      output(input_linear*input + hiss_linear*agaussrand(0, 0.1));
+    }
+  else
+    {
+      if (aup_Random_Mode == 1)
+	{
+	  output(input_linear*input + hiss_linear*agaussrand(0, 0.05));
+	}
+      else
+	{
+	  output(input_linear*input + hiss_linear*arand(0.1));
+	}
+    }
+}

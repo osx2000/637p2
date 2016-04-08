@@ -1,0 +1,5 @@
+
+Networking support has been disabled in this distribution.
+Thus, the examples in this directory will not work.
+
+To learn more, see sfront/src/NETWORK.HTML

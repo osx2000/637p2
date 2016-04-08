@@ -1,0 +1,137 @@
+
+//
+// AudioUnit Effect (aufx) example
+// Lo-pass filter, recoded from Apple SDK's FilterDemo
+//
+
+
+global {
+  srate 44100;    // AU Host may change this value
+  krate 100;
+
+  // stereo in, stereo out
+  
+  inchannels 2;   // If AU Host requests mono in, we see identical
+                  // samples values on left and right.
+
+  outchannels 2;  // If AU Host requests mono out, our stereo output is
+                  // converted to mono "on the way back" to the AU host.
+
+  // sets internal routing diagram for the audiounit:
+  // input_bus -> lo-pass filter instrument -> output_bus
+
+  send (lpf; ; input_bus); 
+
+  // Parameter shown in AudioUnit User Interface
+  // order of appearance sets parameter order for Factory Presets
+
+  ksig aup_Cutoff_Frequency;  // underscores become spaces in the UI
+  ksig aup_Resonance; 
+
+  // Sets the user-interface widget for each parameter 
+  // (the FilterDemo Cocoa UI ignores these, but generic UI uses them)
+  //
+  // Options: slider,            slider_linear, 
+  //          slider_log,        slider_exp,
+  //          slider_squareroot, slider_squarelaw,
+  //          slider_cuberoot,   slider_cubic,
+  //          menu,              checkbox,
+  //          display_menu, display_checkbox, display_number
+
+  ksig aup_Cutoff_Frequency_slider_log;
+  ksig aup_Resonance_slider_linear;     // best taper for dB is linear, not log!
+
+  // Sets the unit to display next to the slider
+  // Units are not used for checkbox and menu widgets
+
+  ksig aup_Cutoff_Frequency_unit_Hz;
+  ksig aup_Resonance_unit_dB; 
+
+  // Parameter info                           min  default    max
+
+  table aup_Cutoff_Frequency_pinfo(data, 3,   12,  1000,   s_rate/2);
+  table        aup_Resonance_pinfo(data, 3,  -20,   0,        20);
+
+  // Factory Preset Tables               Cutoff   Resonance
+
+  table aup_factory_Preset_One(data,  2,  200,       -5);
+  table aup_factory_Preset_Two(data , 2,  1000,      10);
+}
+
+
+//
+// instr lpf
+//
+
+instr lpf () {
+
+  ksig f[5];               // filter coefficients
+
+  filter_coefficients(f);  // update filter coefficients @ k-rate
+  filter_audio(f);         // generate audio output @ a-rate
+}
+
+
+//
+// a-rate opcode: generates audio output
+//
+
+aopcode filter_audio(ksig f[5]) {
+
+  asig x1[inchannels], x2[inchannels];
+  asig y1[inchannels], y2[inchannels], out[inchannels];
+
+  out = f[0]*input + f[1]*x1 + f[2]*x2 - f[3]*y1 - f[4]*y2;
+
+  x2 = x1;
+  x1 = input;
+  y2 = y1;
+  y1 = out;
+  output(out);
+}
+
+//
+// k-rate opcode: updates filter coefficients
+// Equations borrowed from Apple FilterDemo AU
+//
+
+kopcode filter_coefficients(ksig f[5]) {
+
+  imports exports ksig aup_Cutoff_Frequency;
+  imports exports ksig aup_Resonance;
+  ivar pi;
+  ksig lastRes, lastCutoff, normCutoff;
+  ksig r, k, c1, c2, c3;
+
+  pi = 3.14159265358979323846264338327950288;
+
+  if (itime && (aup_Resonance == lastRes) &&
+      (aup_Cutoff_Frequency == lastCutoff))
+    {
+      return();
+    }
+
+  normCutoff = (2 * aup_Cutoff_Frequency)/s_rate;
+  normCutoff = (normCutoff < 0.99) ? normCutoff : 0.99;
+ 
+  r = pow(10, -0.05 * aup_Resonance);
+
+  k = 0.5 * r * sin(pi * normCutoff);
+  c1 = 0.5 * (1 - k) / (1 + k);
+  c2 = (0.5 + c1) * cos(pi * normCutoff);
+  c3 = (0.5 + c1 - c2) * 0.25;
+    
+  f[0] =  2*c3;
+  f[1] =  4*c3;
+  f[2] =  2*c3;
+  f[3] = -2*c2;
+  f[4] =  2*c1;
+
+  lastRes = aup_Resonance; 
+  lastCutoff = aup_Cutoff_Frequency;
+
+  return();
+}
+
+
+

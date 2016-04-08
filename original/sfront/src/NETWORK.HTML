@@ -1,0 +1,73 @@
+
+<H1> Where in the World is <TT>sfront</TT> Networking? </H1>
+
+<P>
+<TT>sfront</TT> networking, a feature that supports MIDI network musical
+performance, has been disabled in this distribution. 
+
+<P>
+We disabled networking support because it requires the presence
+of a server which we no longer are able to host here at Berkeley.
+
+<H2> Building <TT>sfront</TT> with Networking Support </H2>
+
+<p>
+Because <TT>sfront</TT> served as the reference implementation for
+IETF RFC 4695 ("RTP MIDI"), implementors of RFC 4695 may wish to have
+an <TT>sfront</TT> version that includes networking support.  To do
+so, follow the steps below:
+
+<p>
+[1] Edit <TT>sfront/src/tree.h</TT>, and search for the <TT>NET_STATUS</TT>.
+This search will lead to this part of the code:
+
+<pre>
+<tt>
+/* types of networking available */
+
+#define NO_NETWORKING  0
+#define HAS_NETWORKING 1
+#define NET_STATUS     NO_NETWORKING
+</tt>
+</pre>
+
+<P>
+Change <TT>NET_STATUS</TT> definition to have the value
+<TT>HAS_NETWORKING</TT> and save the file.
+
+<P>
+[2] Edit <TT>sfront/src/lib/Makefile</TT> and search for the word
+"Networking".  This search will lead to these instructions:
+
+<tt>
+<pre>
+##
+##  Networking support is not enabled in this sfront distribution.
+##  See the sfront/src/NETWORK.HTML file for full instructions on how
+##  to enable networking support.  In this file, comment out the
+##  blank NSYS definition below, and uncommment the NSYS definition
+##  one the two lines that follow (be sure to uncomment both lines).
+##
+
+NSYS =
+
+##  NSYS = net_sfront net_include net_globals net_siplib \
+##         net_rtplib net_rtcplib net_jsend net_jrecv net_crypto
+</pre>
+</tt>
+Follow these instructions, and then save the Makefile.
+<P>
+[3] <TT>cd sfront/src/</TT> and type <TT>pushd lib; make;
+popd</TT>. This will make a version of <TT>sfront</TT> with networking support.
+
+<H2> Examples and Documentation </H2>
+
+<P>
+Networking examples still ship with the distribution, in the
+subdirectory <TT>sfront/examples/RTIME/network</TT>.
+
+<P>
+Documentation on sfront networking has been removed from
+the sfront reference manual.  However, ...
+
+ 

@@ -1,0 +1,53 @@
+
+// speedt.saol
+// Tests speedt opcode and templates
+// Written by John Lazzaro
+//
+// 
+// Both samples from analogue2@aol.com's collection
+// of Moog Rogue samples.
+//
+
+global {
+
+srate 44100;
+krate 100;
+outchannels 1;
+table noise(sample,-1,"noise.wav");
+table bass(sample,-1,"bass.wav");
+
+}
+
+//
+// Noise played at three sizes
+//
+
+template <noise, twicenoise, halfnoise> () 
+map {factor, size} with { <1, 381952>, <2, 2*381952+1>, <0.5, 190976> }
+
+{
+
+imports exports table noise;
+table newnoise (empty,size);
+
+speedt(noise,newnoise,factor);
+output(0.4*doscil(newnoise));
+
+}
+
+//
+// Bass played at three sizes
+//
+
+template <bass, twicebass, halfbass> () 
+map {factor, size} with { <1, 110848>, <2, 2*110848+1>, <0.5, 55424> }
+
+{
+
+imports exports table bass;
+table newbass (empty,size);
+
+speedt(bass,newbass,factor);
+output(0.4*doscil(newbass));
+
+}

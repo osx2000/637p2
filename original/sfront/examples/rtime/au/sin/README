@@ -1,0 +1,15 @@
+
+Sin is a MusicDevice AudioUnit. Sin is a simple sine-wave virtual instrument.
+
+sin.saol is described in Part V/4 of the MP4SA book shipped with 
+this distribution.
+
+The make commands for this example are:
+
+ "make":  Creates a AU component from your SAOL file in this directory
+ "make install": Installs your plug-in and launches an AU host for testing
+ "make clean": Removes all files created by "make" from this directory
+ "make remove": Un-installs your plugin, and does a "make clean"
+
+The first section of the Makefile documents variables that control
+how the Makefile builds the example.

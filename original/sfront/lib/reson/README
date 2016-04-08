@@ -1,0 +1,7 @@
+
+If you want to use the aluminum bar, marimba, or string
+sounds in a SAOL program, read the abar.hs, marimba.hs,
+or string.hs files for information and software license
+info. The other files in this directory are internal
+libraries not called directly by the user. Real documentation
+will happen soon.

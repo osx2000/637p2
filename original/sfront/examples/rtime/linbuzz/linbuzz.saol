@@ -1,0 +1,152 @@
+
+
+// Sfront, a SAOL to C translator
+// This file: simple test instrument written in SAOL.
+// This license also covers the SASL file in this directory.
+//
+//
+// Copyright (c) 1999-2006, Regents of the University of California
+// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met:
+//
+//  Redistributions of source code must retain the above copyright
+//  notice, this list of conditions and the following disclaimer.
+//
+//  Redistributions in binary form must reproduce the above copyright
+//  notice, this list of conditions and the following disclaimer in the
+//  documentation and/or other materials provided with the distribution.
+//
+//  Neither the name of the University of California, Berkeley nor the
+//  names of its contributors may be used to endorse or promote products
+//  derived from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+//    Maintainer: John Lazzaro, lazzaro@cs.berkeley.edu
+//
+
+
+#include <Slib/ssm.hs>
+#include <Slib/std.hs>
+
+// buzz opcode patch, driven by a MIDI controller
+// connected to the MIDI In jack on the soundcard. 
+//
+// pitch wheel adds fixed-freq vibrato
+// mod wheel changes brightness
+
+
+global { 
+  interp 0;
+  srate 44100; 
+  krate 1050; 
+  outchannels 1; 
+  send(mix; ; output_bus);
+  } 
+
+instr linbuzz (pitch, vel) preset 0 { 
+
+  // declarations
+  table mtab(lineseg,128,0,0,32,1,64,0,96, -1, 127, 0);
+  ivar fbase, envc, fpercent, offset, mean, std;   
+  ksig f, bright, volume;       // sets osc f
+  ivar attack,release, attlim;
+  ksig incr, rel, tot,mod;
+  asig y, fsmooth;    
+  asig init;
+  asig env;
+
+  // **********************
+  // computed during i-passl
+  // **********************
+
+  // statistics of curve 0 of StudioLogic VMK-88
+
+  // mean = 44.6322;
+  // std = 17.5664;
+
+  // statistics of curve 2 of Evolution mk-149
+  
+  mean = 75.8635;
+  std = 15.9908;
+
+  // change these for envelope
+  // should be of k-rate granularity
+
+  attack = int(0.001/KTIME)*KTIME;
+  release = int(0.060/KTIME)*KTIME;
+
+  attlim = attack - 0.5*KTIME;
+
+  // turns MIDI number into 
+  // oscillator constant 
+
+  fbase = cpsmidi(pitch);
+
+  // offset in range [0, 0.4]
+
+  offset = 0.1*(min(2,max((vel-mean)/std,-2)) + 2);
+
+  vel = 0.15*(offset+0.1);
+
+  envc = vel/attack;
+
+  // **********************
+  // computed during k-pass
+  // **********************
+
+  incr = 0;
+  if (released && !rel)
+    {
+      rel = 1;
+      extend(release);
+    }
+  if ((!rel) && (itime < attlim))
+    {
+      incr = envc*ATIME;
+      tot = tot + envc*KTIME;
+    }
+  if (rel)
+    {
+      incr = -tot*ATIME/(release+2*KTIME);
+    }
+
+  // Channel volume scales std, maximum of +/- 2
+  // Wheel sets bias, between 0 and 1
+
+  bright = 0.5 + SSMmodwheel*offset;
+  fpercent = 0.005793;
+  mod = fpercent*(max(SSMbend,0)*koscil(mtab,6+krand(0.1))
+		   + max(-SSMbend,0)*koscil(mtab,5+krand(0.1)));
+
+  f = (mod + 1)*fbase;
+  
+  // **********************
+  // computed during a-pass
+  // **********************
+
+  y = buzz(f,-1,0,bright);
+  env = env + incr;
+  
+  output(env*y);
+  
+  } 
+
+instr mix (  ) { 
+  
+  output(SSMvolume*input); 
+} 	
+

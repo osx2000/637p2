@@ -16,7 +16,7 @@
 #include "header.h"
 #define P printf
 #define NBREAKS 8
-#define NHARMS 20
+#define NHARMS 30
 int anread(char*, int);             /* 05/06 /96 */
 
 /*    global variables declared as externs in monan.h need a root position  */
@@ -80,7 +80,8 @@ int main(int argc, char **argv)
     b[0]=0; brk=0; 
 
     // find break point, interpolate segments from L -> brk -> R   
-    for (i=1;i<Nbk-1;i++) {
+    for (i=0;i<Nbk;i++) {
+      // P("k:%d\tbrk:%d\n",k,brk);
       b[i] = findBreak();
       findLR(Nbk);
       interpolate(LR[0], b[i]);
@@ -108,6 +109,47 @@ int main(int argc, char **argv)
   makeSASL(argv[1]);
 
   free(ampData); free(timeData);
+}
+
+// finds breaks based on largest margin of error
+int findBreak () {
+  int i; float max=0;           
+  for (i=0;i<frames;i++) {
+    if (fabs(w[i]-a[i]) >= max) {
+      max = a[i];
+      brk = i;
+    }   
+  }
+  w[brk] = max;
+  return brk;
+}
+ 
+// finds breakpoints to the left & right of current breakpoint 
+void findLR (int Nbk) {
+  int i, L=0, R=9999;
+  for (i=0;i<Nbk;i++) {
+    if ((i==Nbk-1) && (R==9999)) {
+      R = frames-1;
+    } else 
+    if (b[i] < brk) {
+      if (b[i] >= L) { L = b[i]; }
+    }
+    if (b[i] > brk) {
+      if (b[i] < R) { R = b[i]; }
+      else if (b[i] < 0) { R = frames-1; }
+    } 
+  }
+  LR[0] = L; LR[1] = R;
+}
+
+// uses linear interpolation to approximate points between breaks
+void interpolate (int L, int R) {
+  int i,x, x1=L, x2=R;
+  float y1=w[x1], y2=w[x2];
+  for (i=x1;i<=x2;i++) {
+    x=i;
+    w[i]=y1 + (y2-y1) * (x - x1)/(x2 - x1);
+  }
 }
 
 void makeSASL (char *filename) {
@@ -160,7 +202,7 @@ void makeSAOL (char *filename) {
   }
 
   // write formatted text and data to file
-  fprintf(fp,"global {\n table cyc(harm,128,1);\n srate 44100;\n}\n\n");//*sample rate 22050*
+  fprintf(fp,"global {\n table cyc(harm,128,1);\n srate %.1f;\n}\n\n",header.sr);//*sample rate 22050*
   fprintf(fp,"instr %s (fr) {\n imports exports table cyc;\n\n ksig ",instr);
   for (k=0;k<harms;k++) {
     if (k==harms-1)
@@ -204,47 +246,6 @@ void makeSAOL (char *filename) {
 
   P("%s file created\n",fname);
   fclose(fp);
-}
-
-// finds breaks based on largest margin of error
-int findBreak () {
-  int i; float max=0;           
-  for (i=1;i<frames;i++) {
-    if (fabs(w[i]-a[i]) > max) {
-      max = a[i];
-      brk = i;
-    }   
-  }
-  w[brk] = max;
-  return brk;
-}
- 
-// finds breakpoints to the left & right of current breakpoint 
-void findLR (int Nbk) {
-  int i, L=0, R=9999;
-  for (i=0;i<Nbk;i++) {
-    if ((i==Nbk-1) && (R==9999)) {
-      R = frames-1;
-    } else 
-    if (b[i] < brk) {
-      if (b[i] >= L) { L = b[i]; }
-    }
-    if (b[i] > brk) {
-      if (b[i] < R) { R = b[i]; }
-      else if (b[i] < 0) { R = frames-1; }
-    } 
-  }
-  LR[0] = L; LR[1] = R;
-}
-
-// uses linear interpolation to approximate points between breaks
-void interpolate (int L, int R) {
-  int i,x, x1=L, x2=R;
-  float y1=w[x1], y2=w[x2];
-  for (i=x1;i<=x2;i++) {
-    x=i;
-    w[i]=y1 + (y2-y1) * (x - x1)/(x2 - x1);
-  }
 }
 
 // compare_function for qsort()
