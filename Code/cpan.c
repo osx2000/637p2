@@ -42,8 +42,23 @@ int main(int argc, char **argv)
   
   // read in an analysis file
   anread(argv[1],-1);
-
-  printf("# harmonics = %d # timepoints = %d\n",nhar, npts);
+  // printf("Amplitude data:\n");
+  // printf("harmonic        1       2       3       4       5\n\n");
+  // for (i=0;i<10;i++) {
+  //   printf("frame %d %f ",i,i*dt);
+  //   for (k=1;k<=5;k++)
+  //     printf("%8.2f ",cmag[k + i*nhar1]);
+  //   printf("\n");
+  // }
+  // printf("\nFrequency deviation data:\n");
+  // printf("harmonic        1       2       3       4       5\n\n");
+  // for (i=0;i<npts;i++) {
+  //   printf("frame %d ",i);
+  //   for (k=1;k<=16;k++)
+  //     printf("%8.2f ",dfr[k + i*nhar1]);
+  //   printf("\n");
+  // }
+  // printf("# harmonics = %d # timepoints = %d\n",nhar, npts);
   frames = npts;
   harms = NHARMS;
 
@@ -60,12 +75,12 @@ int main(int argc, char **argv)
     timeData[i] = (float *)malloc(Nbk*sizeof(float));
   }
 
+  a = (float *) calloc(frames,sizeof(float));
+  w = (float *) calloc(frames,sizeof(float));
+  b = (int *) calloc(Nbk,sizeof(int));
+
   // generate amplitude/time data for each harmonic
   for (k=1;k<=harms;k++) { 
-
-    a = (float *) calloc(frames,sizeof(float));
-    w = (float *) calloc(frames,sizeof(float));
-    b = (int *) calloc(Nbk,sizeof(int));
     
     // copy actual data
     for (i=0;i<frames;i++) {
@@ -73,20 +88,31 @@ int main(int argc, char **argv)
     }
     // set all working points to zero
     for (i=0;i<frames;i++) {
-      w[i] = 0; 
+      w[i] = 0.0; 
+      //P("w%d = %f\n",i,w[i]);
     }    
     // reset brkpts & set x=0 as first break point
-    for (i=1;i<Nbk;i++) { b[i]=-1; }
-    b[0]=0; brk=0; 
+    for (i=0;i<Nbk;i++) { b[i]=-1; }
+    b[0]=0; 
+    brk=0; 
 
     // find break point, interpolate segments from L -> brk -> R   
     for (i=0;i<Nbk;i++) {
       // P("k:%d\tbrk:%d\n",k,brk);
       b[i] = findBreak();
+      //P("k:%d\tbrk:%d\tb[%d]=%d\n",k,brk,i,b[i]);
       findLR(Nbk);
-      interpolate(LR[0], b[i]);
-      interpolate(b[i], LR[1]);
-    }      
+      if (LR[0]!=b[i] && brk!=LR[1]) {
+        interpolate(LR[0], b[i]);
+        interpolate(b[i], LR[1]);
+      } else if (LR[0]==b[i]) {
+        interpolate(b[i],LR[1]);
+      }
+      
+    }  
+    // for (i=0;i<frames;i++) {
+    //   //P("frame %d\t w %d = %f\n",k,i,w[i]);
+    // }    
  
     // set x=frames-1 as the last break point, then sort
     b[Nbk-1]=frames-1; brk=Nbk-1;
@@ -99,28 +125,34 @@ int main(int argc, char **argv)
       } else {
         timeData[k-1][i] = (b[i] - b[i-1])*dt; 
       }    
-      ampData[k-1][i]  = a[b[i]] / 32768; // *32768 is scalar*
+      if (i == Nbk-1) {
+        ampData[k-1][i]  = 0; 
+      } else {
+        ampData[k-1][i]  = w[b[i]] / 32768; // *32768 is scalar*
+      }
     }
 
-    free(a); free(w); free(b); 
+    
   }
 
   makeSAOL(argv[1]);
   makeSASL(argv[1]);
-
+  free(a); free(w); free(b); 
   free(ampData); free(timeData);
 }
 
 // finds breaks based on largest margin of error
 int findBreak () {
-  int i; float max=0;           
+  int i; float max=0;          
   for (i=0;i<frames;i++) {
-    if (fabs(w[i]-a[i]) >= max) {
-      max = a[i];
+    //if (w[i] != w[i]) {(w[i]=0.0);}
+    if (fabs(w[i]-a[i]) > max) {
+      max = fabs(w[i]-a[i]);
       brk = i;
     }   
   }
-  w[brk] = max;
+  w[brk] = a[brk];
+  //P("brk=%d\tw=%f\n",brk,w[brk]);
   return brk;
 }
  
@@ -140,6 +172,7 @@ void findLR (int Nbk) {
     } 
   }
   LR[0] = L; LR[1] = R;
+  //P("L=%d   b=%d   R=%d\n",LR[0],brk,LR[1]);
 }
 
 // uses linear interpolation to approximate points between breaks
@@ -148,6 +181,10 @@ void interpolate (int L, int R) {
   float y1=w[x1], y2=w[x2];
   for (i=x1;i<=x2;i++) {
     x=i;
+    if (x2-x1==0) {
+      //P("x1=%d\tx2=%d\n",x1,x2);
+      x2++;
+    }
     w[i]=y1 + (y2-y1) * (x - x1)/(x2 - x1);
   }
 }

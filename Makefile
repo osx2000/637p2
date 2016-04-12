@@ -1,5 +1,5 @@
 
-FILENAME = piano
+FILENAME = trump
 
 SAOLFILE = $(FILENAME).saol
 SASLFILE = $(FILENAME).sasl
