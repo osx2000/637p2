@@ -73,7 +73,6 @@ int main(int argc, char **argv)
     // set all working points to zero
     for (i=0;i<frames;i++) {
       w[i] = 0.0; 
-      //P("w%d = %f\n",i,w[i]);
     }    
     // reset brkpts & set x=0 as first break point
     for (i=0;i<Nbk;i++) { b[i]=-1; }
@@ -108,9 +107,7 @@ int main(int argc, char **argv)
       } else {
         ampData[k-1][i]  = w[b[i]] / 32768; // *32768 is scalar*
       }
-    }
-
-    
+    }    
   }
 
   makeSAOL(argv[1]);
@@ -123,14 +120,13 @@ int main(int argc, char **argv)
 int findBreak () {
   int i; float max=0;          
   for (i=0;i<frames;i++) {
-    //if (w[i] != w[i]) {(w[i]=0.0);}
     if (fabs(w[i]-a[i]) > max) {
       max = fabs(w[i]-a[i]);
       brk = i;
     }   
   }
-  w[brk] = a[brk];
-  //P("brk=%d\tw=%f\n",brk,w[brk]);
+  w[brk] = a[brk];          //P("brk=%d\tw=%f\n",brk,w[brk]);
+  
   return brk;
 }
  
@@ -149,8 +145,7 @@ void findLR (int Nbk) {
       else if (b[i] < 0) { R = frames-1; }
     } 
   }
-  LR[0] = L; LR[1] = R;
-  //P("L=%d   b=%d   R=%d\n",LR[0],brk,LR[1]);
+  LR[0] = L; LR[1] = R;     //P("L=%d   b=%d   R=%d\n",LR[0],brk,LR[1]);
 }
 
 // uses linear interpolation to approximate points between breaks
@@ -160,37 +155,12 @@ void interpolate (int L, int R) {
   for (i=x1;i<=x2;i++) {
     x=i;
     if (x2-x1==0) {
-      //P("x1=%d\tx2=%d\n",x1,x2);
       x2++;
     }
     w[i]=y1 + (y2-y1) * (x - x1)/(x2 - x1);
   }
 }
 
-void makeSASL (char *filename) {
-  FILE *fp;
-  char env[harms][6], y[harms][4];
-  char instr[6]; char fname[11];
-
-  // create instr name & output file name
-  memcpy(instr,filename,5); instr[5] = '\0';
-  memcpy(fname,filename,5); fname[5] = '\0';
-  strcat(fname,".sasl"); fname[10] = '\0';
-  fname[0] = tolower(fname[0]); instr[0] = tolower(instr[0]);
-
-  // open/create output file
-  if (!(fp = fopen(fname,"w+"))) {
-    P("Error opening/creating SASL file\n");
-    exit(1);
-  }
-
-  // 0.0 <instr name> <endtime> <frequency>
-  // <endtime> end
-  fprintf(fp,"0.0 %s %.2f %.0f\n%.2f end\n", instr, tl, fa, tl);
-
-  P("%s file created\n",fname);
-  fclose(fp);
-}
 
 void makeSAOL (char *filename) {
   int i,k;
@@ -217,32 +187,30 @@ void makeSAOL (char *filename) {
   }
 
   // write formatted text and data to file
-  fprintf(fp,"global {\n table cyc(harm,128,1);\n srate %.1f;\n}\n\n",header.sr);//*sample rate 22050*
+  fprintf(fp,"global {\n table cyc(harm,128,1);\n srate %.1f;\n}\n\n",header.sr);
   fprintf(fp,"instr %s (fr) {\n imports exports table cyc;\n\n ksig ",instr);
   for (k=0;k<harms;k++) {
     if (k==harms-1)
       fprintf(fp, "%s;\n\n asig ",env[k]);
     else
-      fprintf(fp,"%s,",env[k]);
+      fprintf(fp, "%s,",env[k]);
   }
   for (k=0;k<harms;k++) {
     if (k==harms-1)
       fprintf(fp, "%s;\n\n",y[k]);
     else
-      fprintf(fp,"%s,",y[k]);
+      fprintf(fp, "%s,",y[k]);
   }
 
   fprintf(fp,"\n\n// **********************\n// computed during k-pass\n\n");
   for (k=0;k<harms;k++) {
     for (i=0;i<Nbk;i++) {
-      if (i==0) {
-        fprintf(fp, "%s = kline(0,\n",env[k]);
-      }
-      else if (i==Nbk-1){
+      if (i==0) 
+        fprintf(fp, "%s = kline(0,\n",env[k]);      
+      else if (i==Nbk-1)
         fprintf(fp, "\t%f, %f);\n\n",timeData[k][i], ampData[k][i]);
-      } else {
+      else 
         fprintf(fp, "\t%f, %f,\n",timeData[k][i], ampData[k][i]);
-      }
     }         
   }
 
@@ -252,12 +220,38 @@ void makeSAOL (char *filename) {
   }  
   fprintf(fp,"\noutput(");
   for (k=0;k<harms;k++) {
-    if (k==harms-1) {
+    if (k==harms-1) 
       fprintf(fp,"%s);\n\n}", y[k]);
-    } else {
+    else 
       fprintf(fp,"%s+", y[k]);
-    }
   }  
+
+  P("%s file created\n",fname);
+  fclose(fp);
+}
+
+/*
+  SASL file format:
+  0.0 <instr name> <endtime> <frequency>
+  <endtime> end
+*/
+void makeSASL (char *filename) {
+  FILE *fp;
+  char env[harms][6], y[harms][4];
+  char instr[6]; char fname[11];
+
+  // create instr name & output file name
+  memcpy(instr,filename,5); instr[5] = '\0';
+  memcpy(fname,filename,5); fname[5] = '\0';
+  strcat(fname,".sasl"); fname[10] = '\0';
+  fname[0] = tolower(fname[0]); instr[0] = tolower(instr[0]);
+
+  // open/create output file
+  if (!(fp = fopen(fname,"w+"))) {
+    P("Error opening/creating SASL file\n");
+    exit(1);
+  }
+  fprintf(fp, "0.0 %s %.2f %.0f\n%.2f end\n", instr, tl, fa, tl);
 
   P("%s file created\n",fname);
   fclose(fp);
