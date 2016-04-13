@@ -42,23 +42,7 @@ int main(int argc, char **argv)
   
   // read in an analysis file
   anread(argv[1],-1);
-  // printf("Amplitude data:\n");
-  // printf("harmonic        1       2       3       4       5\n\n");
-  // for (i=0;i<10;i++) {
-  //   printf("frame %d %f ",i,i*dt);
-  //   for (k=1;k<=5;k++)
-  //     printf("%8.2f ",cmag[k + i*nhar1]);
-  //   printf("\n");
-  // }
-  // printf("\nFrequency deviation data:\n");
-  // printf("harmonic        1       2       3       4       5\n\n");
-  // for (i=0;i<npts;i++) {
-  //   printf("frame %d ",i);
-  //   for (k=1;k<=16;k++)
-  //     printf("%8.2f ",dfr[k + i*nhar1]);
-  //   printf("\n");
-  // }
-  // printf("# harmonics = %d # timepoints = %d\n",nhar, npts);
+
   frames = npts;
   harms = NHARMS;
 
@@ -98,21 +82,15 @@ int main(int argc, char **argv)
 
     // find break point, interpolate segments from L -> brk -> R   
     for (i=0;i<Nbk;i++) {
-      // P("k:%d\tbrk:%d\n",k,brk);
-      b[i] = findBreak();
-      //P("k:%d\tbrk:%d\tb[%d]=%d\n",k,brk,i,b[i]);
+      b[i] = findBreak();               //P("k:%d\tbrk:%d\tb[%d]=%d\n",k,brk,i,b[i]);
       findLR(Nbk);
-      if (LR[0]!=b[i] && brk!=LR[1]) {
-        interpolate(LR[0], b[i]);
-        interpolate(b[i], LR[1]);
-      } else if (LR[0]==b[i]) {
-        interpolate(b[i],LR[1]);
-      }
-      
-    }  
-    // for (i=0;i<frames;i++) {
-    //   //P("frame %d\t w %d = %f\n",k,i,w[i]);
-    // }    
+      // if (LR[0]!=b[i] && brk!=LR[1]) {
+      interpolate(LR[0], b[i]);
+      interpolate(b[i], LR[1]);
+      // } else if (LR[0]==b[i]) {
+      //   interpolate(b[i],LR[1]);
+      // }    
+    }   
  
     // set x=frames-1 as the last break point, then sort
     b[Nbk-1]=frames-1; brk=Nbk-1;
