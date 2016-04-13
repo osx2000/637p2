@@ -1,5 +1,5 @@
 
-FILENAME = piano
+FILENAME = trump
 
 SAOLFILE = $(FILENAME).saol
 SASLFILE = $(FILENAME).sasl
@@ -17,7 +17,8 @@ CC = gcc
 OPT = -O3
 CFLAGS = $(OPT)
 
-SFRONT = ~/CS/637/sfront/bin/sfront
+SFRONT = ~/source/637p2/sfront/bin/sfront
+#SFRONT = ~/CS/637/sfront/bin/sfront
 PLAYER = play
 CMP = cmp
 
